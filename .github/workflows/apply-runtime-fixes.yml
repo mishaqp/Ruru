@@ -11,17 +11,47 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
-      - name: Apply reviewed patch and remove temporary audit helpers
+      - name: Apply reviewed source patch
         shell: bash
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = refs/heads/fix/runtime-audit-ruru-2
-          git apply --check runtime-fixes.patch
-          git apply --index runtime-fixes.patch
-          git rm runtime-fixes.patch .github/workflows/runtime-audit-source.yml .github/workflows/apply-runtime-fixes.yml
+          git apply --exclude='.github/workflows/*' --check runtime-fixes.patch
+          git apply --exclude='.github/workflows/*' --index runtime-fixes.patch
+          git rm runtime-fixes.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path('shared/src/commonMain/composeResources')
+          for locale in ('values', 'values-ru'):
+              for file in (root / locale).glob('*.xml'):
+                  text = file.read_text()
+                  text = re.sub(r'(<string\b[^>]*>)(.*?)(</string>)', lambda m: m[1] + m[2].replace('Aether', 'Ruru') + m[3], text, flags=re.S)
+                  file.write_text(text)
+          updates = {
+              'values': {'settings_root_setup_body_ready': 'Termux command access is configured. Keep Termux running when using its runtime.', 'settings_root_setup_body_available': 'A su binary is present. Root authorization and Termux command setup are separate checks.'},
+              'values-ru': {'settings_root_setup_body_ready': 'Доступ к командам Termux настроен. Оставьте Termux запущенным при использовании его среды.', 'settings_root_setup_body_available': 'Найден su. Авторизация Root и настройка доступа к командам Termux проверяются отдельно.'}
+          }
+          for locale, entries in updates.items():
+              file = root / locale / 'strings.xml'
+              text = file.read_text()
+              for key, value in entries.items():
+                  pattern = r'(<string name="' + re.escape(key) + r'">).*?(</string>)'
+                  text, count = re.subn(pattern, lambda m: m[1] + value + m[2], text)
+                  assert count == 1, key
+              file.write_text(text)
+          file = root / 'values-fa' / 'strings.xml'
+          text = file.read_text()
+          keys = ['chat_code_prompt', 'chat_delete_session_title', 'chat_summarize_file_prompt', 'settings_personalization_summary', 'chat_analyze_image_prompt', 'chat_previous_branch', 'chat_help_write_prompt', 'chat_stop_response', 'chat_next_branch', 'chat_delete_session_message']
+          for key in keys:
+              text, count = re.subn(r'^\s*<string name="' + key + r'">.*?</string>\n', '', text, flags=re.M)
+              assert count == 1, key
+          file.write_text(text)
+          PY
+          git add shared/src/commonMain/composeResources
           git diff --cached --check
           git diff --cached --stat
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'fix: prepare native extension dependencies, expose complete inventory and health checks, compare Ruru revisions'
+          git commit -m 'fix: native extension readiness, complete runtime inventory, Ruru updates and locale cleanup'
           git push origin HEAD:refs/heads/fix/runtime-audit-ruru-2

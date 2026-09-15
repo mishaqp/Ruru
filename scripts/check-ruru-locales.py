@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Validate the complete default/Russian Compose resource catalog without dependencies."""
+"""Validate Ruru's English/Russian-only resource policy and translation parity."""
 from collections import Counter
 from pathlib import Path
 import re
 import sys
 import xml.etree.ElementTree as ET
 
-ROOT = Path(__file__).resolve().parents[1] / "shared/src/commonMain/composeResources"
+REPO = Path(__file__).resolve().parents[1]
+ROOT = REPO / "shared/src/commonMain/composeResources"
+LOCALES_CONFIG = REPO / "app/src/main/res/xml/locales_config.xml"
 FORMAT = re.compile(r"%(?:\d+\$)?[-#+ 0,(<]*\d*(?:\.\d+)?(?:[tT][a-zA-Z]|[a-zA-Z%])")
+LANGUAGE_DIR = re.compile(r"^values-([a-z]{2,3})(?:-r[A-Z]{2})?$")
 
 
 def catalog(directory: Path) -> dict:
@@ -36,7 +39,20 @@ def formats(item) -> Counter:
     return Counter(FORMAT.findall("".join(item.itertext())))
 
 
+def validate_locale_policy() -> None:
+    language_dirs = {p.name for p in ROOT.iterdir() if p.is_dir() and LANGUAGE_DIR.match(p.name)}
+    if language_dirs != {"values-ru"}:
+        raise ValueError(f"Only Russian may exist beside default English resources; found {sorted(language_dirs)}")
+
+    root = ET.parse(LOCALES_CONFIG).getroot()
+    android_name = "{http://schemas.android.com/apk/res/android}name"
+    declared = [node.get(android_name, "") for node in root.findall("locale")]
+    if declared != ["en", "ru"]:
+        raise ValueError(f"Android localeConfig must declare exactly en, ru; found {declared}")
+
+
 def validate(root: Path = ROOT) -> int:
+    validate_locale_policy()
     default, russian = catalog(root / "values"), catalog(root / "values-ru")
     required = {key for key, (item, _) in default.items() if item.get("translatable") != "false"}
     errors = []
@@ -56,7 +72,10 @@ def validate(root: Path = ROOT) -> int:
             errors.append(f"formatted attribute mismatch: {key}")
     if errors:
         raise ValueError("\n".join(errors))
-    print(f"RU resource validation PASS: {len(default)} default = {len(russian)} Russian; XML, unique keys and placeholders valid.")
+    print(
+        f"EN/RU resource validation PASS: {len(default)} English = {len(russian)} Russian; "
+        "XML, unique keys, placeholders and locale policy valid."
+    )
     return len(russian)
 
 

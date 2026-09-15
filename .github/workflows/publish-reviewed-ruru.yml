@@ -6,6 +6,7 @@ on:
 permissions:
   contents: write
   actions: write
+  pull-requests: read
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -29,7 +30,7 @@ jobs:
           base = os.environ['GITHUB_API_URL'] + '/repos/' + repo
           sha = '42c08ec45d5095dfb1eb59153b3d223acc35d769'
           tag = 'v0.1.1-ruru.1'
-          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2026-03-10'}
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28'}
 
           def api(path, data=None):
               payload = None if data is None else json.dumps(data).encode()

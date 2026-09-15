@@ -149,9 +149,11 @@ jobs:
           APK: ${{ steps.apk.outputs.built }}
         run: |
           set -euo pipefail
+          # apksigner exits non-zero for an unsigned or tampered APK, so the exit
+          # code itself is the verification. The signer count guards the case where
+          # verification passes but no certificate was recorded.
           "${{ steps.apk.outputs.build_tools }}/apksigner" verify --verbose --print-certs "$APK" | tee apksigner.txt
-          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" apksigner.txt \
-            || grep -q "Verified using v1 scheme" apksigner.txt
+          grep -qE "^Number of signers: 1$" apksigner.txt
           echo "APK is signed."
 
       - name: Record signing certificate SHA-256
@@ -159,9 +161,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cert="$(grep -m1 -E 'Signer #1 certificate SHA-256 digest:' apksigner.txt | sed 's/.*digest: *//' | tr -d ' ' | tr 'A-Z' 'a-z')"
+          # build-tools differ: older apksigner prints "Signer #1 certificate SHA-256
+          # digest: ...", newer ones prepend the scheme ("V2 Signer: certificate ...").
+          # Match the certificate line itself, and take the first one (the public key
+          # digest also says SHA-256 and comes later).
+          cert="$(grep -m1 -E 'certificate SHA-256 digest:' apksigner.txt | sed 's/.*digest: *//' | tr -d ' :' | tr 'A-Z' 'a-z')"
           if [[ -z "$cert" ]]; then
             echo "::error::Could not read the signing certificate fingerprint"
+            exit 1
+          fi
+          expected="$(tr -d ' \n' < .github/ruru-signing-cert-sha256.txt 2>/dev/null || true)"
+          if [[ -n "$expected" && "$expected" != "$cert" ]]; then
+            echo "::error::Signing certificate changed! expected ${expected}, got ${cert}"
+            echo "::error::Every installed Ruru would reject this update."
             exit 1
           fi
           echo "$cert" > RURU_SIGNING_CERT_SHA256.txt

@@ -1,0 +1,50 @@
+name: Apply EN RU localization
+on:
+  push:
+    branches: ['i18n/en-ru-only']
+    paths: ['.github/workflows/apply-en-ru-localization.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Apply reviewed localization migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/i18n/en-ru-only
+          python3 scripts/apply-en-ru-only.py
+          git rm \
+            shared/src/commonMain/composeResources/values-fa/strings.xml \
+            shared/src/commonMain/composeResources/values-zh-rCN/strings.xml \
+            app/src/main/res/font/vazirmatn_regular.ttf \
+            app/src/main/res/font/vazirmatn_medium.ttf \
+            app/src/main/res/font/vazirmatn_semibold.ttf \
+            app/src/main/res/font/vazirmatn_bold.ttf
+          python3 scripts/check-ruru-locales.py
+          if grep -RInE --include='*.kt' 'AppLanguage\.(SimplifiedChinese|Persian)' app/src/main shared/src/commonMain shared/src/androidMain shared/src/iosMain; then
+            echo '::error::Removed language enum is still referenced by production source'
+            exit 1
+          fi
+      - name: Verify Pi bridge and localized bundled UI
+        shell: bash
+        working-directory: pi-bridge
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run check
+          npm test
+      - name: Commit only after localization checks pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git diff --cached --check
+          git status --short
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(i18n): keep English and Russian and localize bundled extension UI'
+          git push origin HEAD:refs/heads/i18n/en-ru-only

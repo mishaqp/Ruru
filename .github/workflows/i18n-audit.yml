@@ -17,22 +17,60 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          {
-            echo '=== LOCALE DIRECTORIES ==='
-            find shared/src/commonMain/composeResources -maxdepth 1 -type d -name 'values*' -printf '%f\n' | sort
-            echo
-            echo '=== LANGUAGE / LOCALE REFERENCES ==='
-            rg -n --glob '!**/build/**' --glob '!**/node_modules/**' '(AppLanguage|LocaleConfig|localeConfig|languageTag|languageCode|Persian|Farsi|Chinese|Simplified|فارسی|简体|zh-rCN|values-fa|values-zh|\bfa\b|\bzh\b)' app shared | head -n 500 || true
-            echo
-            echo '=== ANDROID/COMPOSE HARD-CODED UI CANDIDATES ==='
-            rg -n --glob '*.kt' --glob '!**/build/**' '(Text|title|label|contentDescription|placeholder|supportingText|message|description)\s*[=(][^\n]*"[A-Za-z][^"]*"' app shared | head -n 800 || true
-            echo
-            echo '=== EXTENSION USER-FACING STRING CANDIDATES ==='
-            rg -n --glob '*.{ts,tsx,js,mjs,json}' --glob '!**/node_modules/**' --glob '!**/dist/**' '(title|label|description|message|placeholder|text|name|command|notify|error|status)\s*[:=]\s*[`"'"'][A-Za-z][^`"'"']*[`"'"']' extensions pi-bridge | head -n 1200 || true
-            echo
-            echo '=== XML / LOCALE FILES OUTSIDE COMPOSE RESOURCES ==='
-            find app shared -type f \( -iname '*locale*' -o -iname '*language*' \) -print | sort
-          } | tee i18n-audit.txt
+          python3 - <<'PY' | tee i18n-audit.txt
+          from pathlib import Path
+          import re
+
+          print('=== LOCALE DIRECTORIES ===')
+          root = Path('shared/src/commonMain/composeResources')
+          for p in sorted(root.glob('values*')):
+              if p.is_dir(): print(p.name)
+
+          print('\n=== LANGUAGE / LOCALE REFERENCES ===')
+          lang = re.compile(r'AppLanguage|LocaleConfig|localeConfig|languageTag|languageCode|Persian|Farsi|Chinese|Simplified|فارسی|简体|zh-rCN|values-fa|values-zh|["\']fa["\']|["\']zh(?:-CN)?["\']')
+          for base in (Path('app'), Path('shared')):
+              for p in sorted(base.rglob('*')):
+                  if not p.is_file() or 'build' in p.parts: continue
+                  if p.suffix not in {'.kt','.kts','.xml','.json','.plist','.gradle'}: continue
+                  try: lines = p.read_text(errors='ignore').splitlines()
+                  except OSError: continue
+                  for n, line in enumerate(lines, 1):
+                      if lang.search(line): print(f'{p}:{n}:{line.strip()}')
+
+          print('\n=== ANDROID/COMPOSE HARD-CODED UI CANDIDATES ===')
+          ui = re.compile(r'(?:Text|title|label|contentDescription|placeholder|supportingText|message|description)\s*[=(][^\n]*["\'][A-Za-z][^"\']*["\']')
+          count = 0
+          for base in (Path('app'), Path('shared')):
+              for p in sorted(base.rglob('*.kt')):
+                  if 'build' in p.parts: continue
+                  lines = p.read_text(errors='ignore').splitlines()
+                  for n, line in enumerate(lines, 1):
+                      if ui.search(line):
+                          print(f'{p}:{n}:{line.strip()}'); count += 1
+                          if count >= 1200: break
+                  if count >= 1200: break
+              if count >= 1200: break
+
+          print('\n=== EXTENSION USER-FACING STRING CANDIDATES ===')
+          ext = re.compile(r'(?:title|label|description|message|placeholder|text|name|command|notify|error|status)\s*[:=]\s*[`"\'][A-Za-z][^`"\']*[`"\']')
+          count = 0
+          for base in (Path('extensions'), Path('pi-bridge')):
+              for p in sorted(base.rglob('*')):
+                  if not p.is_file() or 'node_modules' in p.parts or 'dist' in p.parts: continue
+                  if p.suffix not in {'.ts','.tsx','.js','.mjs','.json'}: continue
+                  lines = p.read_text(errors='ignore').splitlines()
+                  for n, line in enumerate(lines, 1):
+                      if ext.search(line):
+                          print(f'{p}:{n}:{line.strip()}'); count += 1
+                          if count >= 1600: break
+                  if count >= 1600: break
+              if count >= 1600: break
+
+          print('\n=== XML / LOCALE FILES OUTSIDE COMPOSE RESOURCES ===')
+          for base in (Path('app'), Path('shared')):
+              for p in sorted(base.rglob('*')):
+                  if p.is_file() and ('locale' in p.name.lower() or 'language' in p.name.lower()): print(p)
+          PY
       - uses: actions/upload-artifact@v7
         with:
           name: ruru-i18n-audit

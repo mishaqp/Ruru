@@ -1,0 +1,44 @@
+name: Runtime regression checks
+on:
+  workflow_dispatch:
+  push:
+    branches: ['fix/runtime-audit-ruru-2']
+    paths: ['pi-bridge/**', 'extensions/**', 'scripts/check-ruru-locales.py', '.github/workflows/runtime-audit.yml']
+  pull_request:
+    paths: ['pi-bridge/**', 'extensions/**', 'scripts/check-ruru-locales.py', '.github/workflows/runtime-audit.yml']
+permissions:
+  contents: read
+concurrency:
+  group: runtime-regression-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Node version
+        run: node --version
+      - name: Install locked bridge dependencies
+        working-directory: pi-bridge
+        run: npm ci --no-audit --no-fund
+      - name: Type check
+        working-directory: pi-bridge
+        run: npm run check
+      - name: Bridge integration tests (local fixtures, no model API)
+        working-directory: pi-bridge
+        run: npm test
+      - name: Collect test support
+        if: always()
+        run: |
+          mkdir -p audit-support
+          cp pi-bridge/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js audit-support/loader.js
+          cp pi-bridge/node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js audit-support/resource-loader.js
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: runtime-audit-support
+          path: audit-support
+          retention-days: 3

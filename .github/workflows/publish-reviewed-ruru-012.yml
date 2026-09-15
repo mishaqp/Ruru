@@ -1,0 +1,45 @@
+name: Publish reviewed Ruru 0.1.2
+on:
+  push:
+    branches: ['ci/release-ruru-0.1.2']
+    paths: ['.github/workflows/publish-reviewed-ruru-012.yml']
+permissions:
+  contents: write
+  actions: write
+  pull-requests: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Tag verified main and dispatch signed release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from urllib.error import HTTPError
+          from urllib.request import Request, urlopen
+          repo=os.environ['GITHUB_REPOSITORY']; base=os.environ['GITHUB_API_URL']+'/repos/'+repo
+          sha='d48f5ebbb0a0553c8ef672472b664b208d511941'; tag='v0.1.2-ruru.1'
+          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'}
+          def api(path,data=None):
+              req=Request(base+path,data=None if data is None else json.dumps(data).encode(),headers=headers,method='GET' if data is None else 'POST')
+              with urlopen(req,timeout=30) as r:
+                  body=r.read(); return json.loads(body) if body else None
+          assert api('/git/ref/heads/main')['object']['sha']==sha, 'main moved; refusing release'
+          pr=api('/pulls/8'); assert pr['merged'] and pr['merge_commit_sha']==sha
+          for run_id in (35018147171,35018147174):
+              run=api('/actions/runs/'+str(run_id)); assert run['status']=='completed' and run['conclusion']=='success'
+              assert run['head_sha']=='60b5c08ff365c351a50f2fd00bbf45efe6ddaa20'
+          try:
+              ref=api('/git/ref/tags/'+tag)
+          except HTTPError as e:
+              if e.code!=404: raise
+              ref=api('/git/refs',{'ref':'refs/tags/'+tag,'sha':sha})
+          assert ref['object']['sha']==sha
+          api('/actions/workflows/release-ruru.yml/dispatches',{'ref':tag,'inputs':{'version_name':'0.1.2-ruru.1','version_code':'10201'}})
+          print('dispatched',tag,sha)
+          PY

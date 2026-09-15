@@ -92,8 +92,8 @@ function runNpmInstall(packageRoot: string): Promise<void> {
     });
     let stdout = "";
     let stderr = "";
-    child.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
-    child.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+    child.stdout?.on("data", (chunk: Buffer) => { stdout = (stdout + chunk.toString()).slice(-16_384); });
+    child.stderr?.on("data", (chunk: Buffer) => { stderr = (stderr + chunk.toString()).slice(-16_384); });
     let settled = false;
     const finish = (callback: () => void) => {
       if (settled) return;

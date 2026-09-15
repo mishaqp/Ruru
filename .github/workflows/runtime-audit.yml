@@ -1,0 +1,45 @@
+name: Runtime regression checks
+on:
+  workflow_dispatch:
+  push:
+    branches: ['main', 'fix/runtime-audit-ruru-2']
+    paths: ['pi-bridge/**', 'extensions/**', 'shared/src/commonMain/composeResources/**', 'scripts/check-ruru-locales.py', '.github/workflows/runtime-audit.yml']
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: runtime-regression-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate Russian resources
+        shell: bash
+        run: python3 scripts/check-ruru-locales.py | tee locale-check.log
+      - name: Node version
+        run: node --version
+      - name: Install locked bridge dependencies
+        working-directory: pi-bridge
+        run: npm ci --no-audit --no-fund
+      - name: Type check
+        working-directory: pi-bridge
+        shell: bash
+        run: npm run check 2>&1 | tee ../typecheck.log
+      - name: Bridge and real bundled-extension tests (no model API)
+        working-directory: pi-bridge
+        shell: bash
+        run: npm test 2>&1 | tee ../runtime-tests.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: runtime-regression-reports
+          path: |
+            locale-check.log
+            typecheck.log
+            runtime-tests.log
+          retention-days: 14

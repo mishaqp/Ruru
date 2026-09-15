@@ -26,11 +26,9 @@ internal val DefaultDisabledPreinstalledExtensionPaths: Set<String> = setOf(
     "/root/.aether/extensions/pi-subagents",
 )
 
-internal val DefaultDisabledPreinstalledExtensionIds: Set<String> = setOf(
-    "import:aether:/root/.aether/extensions/pi-web-access",
-    "import:aether:/root/.aether/extensions/pi-mcp-adapter",
-    "import:aether:/root/.aether/extensions/pi-subagents",
-)
+// Ruru Android enables the bundled integrations on an unset preference only.
+// A persisted disabled set (including an explicit empty set) is never overwritten.
+internal val DefaultDisabledPreinstalledExtensionIds: Set<String> = emptySet()
 
 class PiExtensionStateRepository(
     private val context: Context,

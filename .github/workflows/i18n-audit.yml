@@ -19,57 +19,56 @@ jobs:
           set -euo pipefail
           python3 - <<'PY' | tee i18n-audit.txt
           from pathlib import Path
-          import re
+          import os, re
+
+          SKIP={'.git','build','node_modules','dist','.gradle'}
+          def files(base, suffixes):
+              for root, dirs, names in os.walk(base):
+                  dirs[:] = [d for d in dirs if d not in SKIP]
+                  for name in names:
+                      p=Path(root)/name
+                      if p.suffix in suffixes: yield p
 
           print('=== LOCALE DIRECTORIES ===')
-          root = Path('shared/src/commonMain/composeResources')
+          root=Path('shared/src/commonMain/composeResources')
           for p in sorted(root.glob('values*')):
               if p.is_dir(): print(p.name)
 
           print('\n=== LANGUAGE / LOCALE REFERENCES ===')
-          lang = re.compile(r'AppLanguage|LocaleConfig|localeConfig|languageTag|languageCode|Persian|Farsi|Chinese|Simplified|فارسی|简体|zh-rCN|values-fa|values-zh|["\']fa["\']|["\']zh(?:-CN)?["\']')
-          for base in (Path('app'), Path('shared')):
-              for p in sorted(base.rglob('*')):
-                  if not p.is_file() or 'build' in p.parts: continue
-                  if p.suffix not in {'.kt','.kts','.xml','.json','.plist','.gradle'}: continue
-                  try: lines = p.read_text(errors='ignore').splitlines()
-                  except OSError: continue
-                  for n, line in enumerate(lines, 1):
+          lang=re.compile(r'AppLanguage|LocaleConfig|localeConfig|languageTag|languageCode|Persian|Farsi|Chinese|Simplified|فارسی|简体|zh-rCN|values-fa|values-zh|["\']fa["\']|["\']zh(?:-CN)?["\']')
+          for base in ('app','shared'):
+              for p in files(base,{'.kt','.kts','.xml','.json','.plist','.gradle'}):
+                  for n,line in enumerate(p.read_text(errors='ignore').splitlines(),1):
                       if lang.search(line): print(f'{p}:{n}:{line.strip()}')
 
           print('\n=== ANDROID/COMPOSE HARD-CODED UI CANDIDATES ===')
-          ui = re.compile(r'(?:Text|title|label|contentDescription|placeholder|supportingText|message|description)\s*[=(][^\n]*["\'][A-Za-z][^"\']*["\']')
-          count = 0
-          for base in (Path('app'), Path('shared')):
-              for p in sorted(base.rglob('*.kt')):
-                  if 'build' in p.parts: continue
-                  lines = p.read_text(errors='ignore').splitlines()
-                  for n, line in enumerate(lines, 1):
+          ui=re.compile(r'(?:Text|title|label|contentDescription|placeholder|supportingText|message|description)\s*[=(][^\n]*["\'][A-Za-z][^"\']*["\']')
+          count=0
+          for base in ('app','shared'):
+              for p in files(base,{'.kt'}):
+                  for n,line in enumerate(p.read_text(errors='ignore').splitlines(),1):
                       if ui.search(line):
-                          print(f'{p}:{n}:{line.strip()}'); count += 1
-                          if count >= 1200: break
-                  if count >= 1200: break
-              if count >= 1200: break
+                          print(f'{p}:{n}:{line.strip()}'); count+=1
+                          if count>=1200: break
+                  if count>=1200: break
+              if count>=1200: break
 
           print('\n=== EXTENSION USER-FACING STRING CANDIDATES ===')
-          ext = re.compile(r'(?:title|label|description|message|placeholder|text|name|command|notify|error|status)\s*[:=]\s*[`"\'][A-Za-z][^`"\']*[`"\']')
-          count = 0
-          for base in (Path('extensions'), Path('pi-bridge')):
-              for p in sorted(base.rglob('*')):
-                  if not p.is_file() or 'node_modules' in p.parts or 'dist' in p.parts: continue
-                  if p.suffix not in {'.ts','.tsx','.js','.mjs','.json'}: continue
-                  lines = p.read_text(errors='ignore').splitlines()
-                  for n, line in enumerate(lines, 1):
+          ext=re.compile(r'(?:title|label|description|message|placeholder|text|name|command|notify|error|status)\s*[:=]\s*[`"\'][A-Za-z][^`"\']*[`"\']')
+          count=0
+          for base in ('extensions','pi-bridge'):
+              for p in files(base,{'.ts','.tsx','.js','.mjs','.json'}):
+                  for n,line in enumerate(p.read_text(errors='ignore').splitlines(),1):
                       if ext.search(line):
-                          print(f'{p}:{n}:{line.strip()}'); count += 1
-                          if count >= 1600: break
-                  if count >= 1600: break
-              if count >= 1600: break
+                          print(f'{p}:{n}:{line.strip()}'); count+=1
+                          if count>=1600: break
+                  if count>=1600: break
+              if count>=1600: break
 
           print('\n=== XML / LOCALE FILES OUTSIDE COMPOSE RESOURCES ===')
-          for base in (Path('app'), Path('shared')):
-              for p in sorted(base.rglob('*')):
-                  if p.is_file() and ('locale' in p.name.lower() or 'language' in p.name.lower()): print(p)
+          for base in ('app','shared'):
+              for p in files(base,{'.kt','.xml','.plist'}):
+                  if 'locale' in p.name.lower() or 'language' in p.name.lower(): print(p)
           PY
       - uses: actions/upload-artifact@v7
         with:

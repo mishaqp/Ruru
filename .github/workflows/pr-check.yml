@@ -1,17 +1,13 @@
 name: PR Check
-
 on:
   workflow_dispatch:
   pull_request:
-
 permissions:
   contents: read
   pull-requests: read
-
 concurrency:
   group: pr-check-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -21,10 +17,7 @@ jobs:
       - name: Run all checks for manual dispatch
         id: manual
         if: github.event_name == 'workflow_dispatch'
-        shell: bash
-        run: |
-          echo "android=true" >> "$GITHUB_OUTPUT"
-
+        run: echo 'android=true' >> "$GITHUB_OUTPUT"
       - name: Detect changed areas
         id: filter
         if: github.event_name == 'pull_request'
@@ -35,9 +28,12 @@ jobs:
               - 'app/**'
               - 'shared/**'
               - 'pi-bridge/**'
+              - 'extensions/**'
+              - 'scripts/check-ruru-locales.py'
               - 'packages/extension-api/**'
               - 'third_party/termux/**'
               - '.github/workflows/build-nightly-apk.yml'
+              - '.github/workflows/release-ruru.yml'
               - 'build.gradle.kts'
               - 'settings.gradle.kts'
               - 'gradle.properties'
@@ -49,40 +45,34 @@ jobs:
     needs: changes
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.android == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: enhanced
           cache-read-only: false
-
-      # 'tools' was removed from the modern cmdline-tools, so the action's default
-      # package list ("tools platform-tools") makes sdkmanager exit 1 before Gradle runs.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools'
-
       - name: Make Gradle executable
         run: chmod +x ./gradlew
-
+      - name: Validate Russian resources
+        run: python3 scripts/check-ruru-locales.py
       - name: Test shared and Android code
         run: ./gradlew :shared:testDebugUnitTest :app:testDebugUnitTest --stacktrace
-
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
-
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:
@@ -90,3 +80,12 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 7
           archive: false
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-test-reports
+          path: |
+            app/build/test-results/**
+            shared/build/test-results/**
+          retention-days: 14

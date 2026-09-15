@@ -24,6 +24,7 @@ jobs:
             app/src/main/res/font/vazirmatn_medium.ttf \
             app/src/main/res/font/vazirmatn_semibold.ttf \
             app/src/main/res/font/vazirmatn_bold.ttf
+          rmdir shared/src/commonMain/composeResources/values-fa shared/src/commonMain/composeResources/values-zh-rCN
           python3 scripts/check-ruru-locales.py
           if grep -RInE --include='*.kt' 'AppLanguage\.(SimplifiedChinese|Persian)' app/src/main shared/src/commonMain shared/src/androidMain shared/src/iosMain; then
             echo '::error::Removed language enum is still referenced by production source'

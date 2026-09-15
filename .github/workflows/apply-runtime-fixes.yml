@@ -1,0 +1,27 @@
+name: Apply reviewed runtime fixes
+on:
+  push:
+    branches: ['fix/runtime-audit-ruru-2']
+    paths: ['.github/workflows/apply-runtime-fixes.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Apply reviewed patch and remove temporary audit helpers
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/fix/runtime-audit-ruru-2
+          git apply --check runtime-fixes.patch
+          git apply --index runtime-fixes.patch
+          git rm runtime-fixes.patch .github/workflows/runtime-audit-source.yml .github/workflows/apply-runtime-fixes.yml
+          git diff --cached --check
+          git diff --cached --stat
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: prepare native extension dependencies, expose complete inventory and health checks, compare Ruru revisions'
+          git push origin HEAD:refs/heads/fix/runtime-audit-ruru-2

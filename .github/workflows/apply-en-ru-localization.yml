@@ -17,14 +17,14 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF" = refs/heads/i18n/en-ru-only
           python3 scripts/apply-en-ru-only.py
+          git rm -r \
+            shared/src/commonMain/composeResources/values-fa \
+            shared/src/commonMain/composeResources/values-zh-rCN
           git rm \
-            shared/src/commonMain/composeResources/values-fa/strings.xml \
-            shared/src/commonMain/composeResources/values-zh-rCN/strings.xml \
             app/src/main/res/font/vazirmatn_regular.ttf \
             app/src/main/res/font/vazirmatn_medium.ttf \
             app/src/main/res/font/vazirmatn_semibold.ttf \
             app/src/main/res/font/vazirmatn_bold.ttf
-          rmdir shared/src/commonMain/composeResources/values-fa shared/src/commonMain/composeResources/values-zh-rCN
           python3 scripts/check-ruru-locales.py
           if grep -RInE --include='*.kt' 'AppLanguage\.(SimplifiedChinese|Persian)' app/src/main shared/src/commonMain shared/src/androidMain shared/src/iosMain; then
             echo '::error::Removed language enum is still referenced by production source'

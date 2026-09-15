@@ -89,8 +89,12 @@ jobs:
           cache-provider: enhanced
           cache-read-only: false
 
+      # 'tools' was removed from the modern cmdline-tools, so the action's default
+      # package list ("tools platform-tools") makes sdkmanager exit 1 before Gradle runs.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
 
       - name: Make Gradle executable
         run: chmod +x ./gradlew

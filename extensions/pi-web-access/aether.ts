@@ -1106,6 +1106,20 @@ const webToolTitles = [
 	["get_search_content", "Reading web content", "Read web content"],
 ] as const;
 
+function isRussianContext(context: Record<string, unknown> | undefined): boolean {
+	if (!context) return false;
+	const direct = typeof context.language === "string" ? context.language : "";
+	const settings = context.settings && typeof context.settings === "object" && !Array.isArray(context.settings)
+		? context.settings as Record<string, unknown>
+		: undefined;
+	const nested = typeof settings?.language === "string" ? settings.language : "";
+	return (direct || nested).toLowerCase().startsWith("ru");
+}
+
+function uiText(context: Record<string, unknown> | undefined, english: string, russian: string): string {
+	return isRussianContext(context) ? russian : english;
+}
+
 export const activateAether = async (aether: AetherExtensionAPI) => {
 	(globalThis as Record<PropertyKey, unknown>)[BRIDGE_KEY] = { api: aether } satisfies WebAccessBridge;
 	for (const [toolName, runningTitle, completedTitle] of webToolTitles) {
@@ -1165,7 +1179,7 @@ export const activateAether = async (aether: AetherExtensionAPI) => {
 
 	const registerBindingActions = () => {
 		for (const binding of allBindings) {
-			aether.registerAction(`settings:${SETTINGS_PAGE_ID}:${binding.setting.id}`, async (payload) => {
+			aether.registerAction(`settings:${SETTINGS_PAGE_ID}:${binding.setting.id}`, async (payload, context) => {
 				const raw = payload.value !== undefined ? payload.value : payload.checked;
 				const value = normalizeSettingValue(binding, raw);
 				const next = readConfig();
@@ -1175,7 +1189,7 @@ export const activateAether = async (aether: AetherExtensionAPI) => {
 				if (binding.sensitive) {
 					aether.storage.set(binding.setting.id, value);
 					aether.storage.set(settingStorageKey(binding.setting.id), value);
-					await aether.host.invoke("app.notify", { message: "Credential or base URL updated. Reload the Pi extension to apply it." }).catch(() => {});
+					await aether.host.invoke("app.notify", { message: uiText(context, "Credential or base URL updated. Reload the Pi extension to apply it.", "Учётные данные или базовый URL обновлены. Перезагрузите расширение Pi, чтобы применить изменения.") }).catch(() => {});
 					return { setting: binding.setting.id, value };
 				}
 				aether.storage.set(binding.setting.id, value);
@@ -1188,7 +1202,7 @@ export const activateAether = async (aether: AetherExtensionAPI) => {
 					aether.storage.set(settingStorageKey("provider"), "auto");
 					registerSettingsPage("auto");
 				}
-				await aether.host.invoke("app.notify", { message: "Web Access setting saved. Reload the Pi extension to apply it." }).catch(() => {});
+				await aether.host.invoke("app.notify", { message: uiText(context, "Web Access setting saved. Reload the Pi extension to apply it.", "Настройка веб-доступа сохранена. Перезагрузите расширение Pi, чтобы применить изменение.") }).catch(() => {});
 				return { setting: binding.setting.id, value };
 			});
 		}
@@ -1200,8 +1214,8 @@ export const activateAether = async (aether: AetherExtensionAPI) => {
 	for (const definition of messageTypes(aether)) aether.registerMessageType(definition);
 
 	aether.registerAction("dismiss-latest-activity", () => aether.storage.delete("latestActivity"));
-	aether.registerAction("research-draft", async () => {
-		await aether.host.invoke("app.appendDraftInput", { text: "Research this on the web with multiple independent sources: " });
+	aether.registerAction("research-draft", async (_payload, context) => {
+		await aether.host.invoke("app.appendDraftInput", { text: uiText(context, "Research this on the web with multiple independent sources: ", "Исследуй это в интернете по нескольким независимым источникам: ") });
 	});
 	aether.registerComposerMenuItem({
 		id: "research-web",
@@ -1222,7 +1236,11 @@ export const activateAether = async (aether: AetherExtensionAPI) => {
 			const activity = latest as AetherJsonObject;
 			const payload = activity.payload && typeof activity.payload === "object" ? activity.payload as AetherJsonObject : {};
 			const type = String(activity.type ?? "");
-			const title = type === "web-search-error" ? "Web access error" : type === "web-search-content-ready" ? "Web content ready" : "Latest web activity";
+			const title = type === "web-search-error"
+				? uiText(context, "Web access error", "Ошибка веб-доступа")
+				: type === "web-search-content-ready"
+					? uiText(context, "Web content ready", "Веб-контент готов")
+					: uiText(context, "Latest web activity", "Последняя веб-активность");
 			return aether.ui.column([
 				statusCard(aether, title, { ...payload, text: activity.text }, type === "web-search-error" ? "error" : "neutral"),
 				aether.ui.button("Dismiss", "dismiss-latest-activity", { tone: "neutral", icon: "close" }),

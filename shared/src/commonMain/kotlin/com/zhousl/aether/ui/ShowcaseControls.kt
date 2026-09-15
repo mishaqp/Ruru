@@ -27,6 +27,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.zhousl.aether.ui.theme.AetherSurface
+import com.zhousl.aether.shared.resources.Res
+import com.zhousl.aether.shared.resources.showcase_pause
+import com.zhousl.aether.shared.resources.showcase_replay_controls
+import com.zhousl.aether.shared.resources.showcase_replay_from_beginning
+import com.zhousl.aether.shared.resources.showcase_resume
+import com.zhousl.aether.shared.resources.showcase_show_completed_session
+import org.jetbrains.compose.resources.stringResource
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -49,23 +56,23 @@ fun ShowcasePlaybackButton(controls: ShowcaseControls) {
     Box(Modifier.padding(end = 8.dp)) {
         HeaderCircleButton(
             icon = if (controls.playing && !controls.paused) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-            contentDescription = "Replay controls",
+            contentDescription = stringResource(Res.string.showcase_replay_controls),
             onClick = { expanded = true }, size = 38.dp, iconSize = 19.dp,
             containerColor = AetherSurface.copy(alpha = 0.96f),
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
-                text = { Text("Replay from beginning") },
+                text = { Text(stringResource(Res.string.showcase_replay_from_beginning)) },
                 leadingIcon = { Icon(LucideIcons.RotateCcw, null) },
                 onClick = { expanded = false; controls.onReplay() },
             )
             if (controls.playing) DropdownMenuItem(
-                text = { Text(if (controls.paused) "Resume" else "Pause") },
+                text = { Text(stringResource(if (controls.paused) Res.string.showcase_resume else Res.string.showcase_pause)) },
                 leadingIcon = { Icon(if (controls.paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause, null) },
                 onClick = { expanded = false; controls.onPause() },
             )
             DropdownMenuItem(
-                text = { Text("Show completed session") },
+                text = { Text(stringResource(Res.string.showcase_show_completed_session)) },
                 leadingIcon = { Icon(Icons.Rounded.DoneAll, null) },
                 onClick = { expanded = false; controls.onRestore() },
             )

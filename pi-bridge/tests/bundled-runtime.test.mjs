@@ -71,6 +71,17 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
     assert.equal(ui.reloaded, true, JSON.stringify(ui));
     assert.deepEqual(ui.snapshot.errors, [], JSON.stringify(ui.snapshot.errors));
     assert.ok(ui.snapshot.settings.length >= 3);
+    const ruSnapshot = JSON.stringify(ui.snapshot);
+    assert.match(ruSnapshot, /Веб-доступ/);
+    assert.match(ruSnapshot, /MCP-серверы/);
+    assert.match(ruSnapshot, /Субагенты/);
+    assert.doesNotMatch(ruSnapshot, /"Web Access"/);
+    assert.doesNotMatch(ruSnapshot, /"MCP Servers"/);
+    const enUi = await request("reload_aether_extensions", { context: { platform: "android", language: "en" } });
+    const enSnapshot = JSON.stringify(enUi.snapshot);
+    assert.match(enSnapshot, /Web Access/);
+    assert.match(enSnapshot, /MCP Servers/);
+    assert.match(enSnapshot, /Subagents/);
     const disabled = names.map(name => join(root, name));
     await request("reload_all_extensions", { disabled_extension_paths: disabled, disabled_package_sources: [] });
     await request("run_turn", { ...turn, disabled_extension_paths: disabled });

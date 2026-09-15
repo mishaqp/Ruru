@@ -27,7 +27,7 @@ class AetherSettingsStoreTest {
             userAgent = "Aether-Test",
             customHeaders = listOf(LlmCustomHeader("X-Test", "value")),
             developerRoleUnsupported = true,
-            language = AppLanguage.SimplifiedChinese,
+            language = AppLanguage.Russian,
             themeMode = AppThemeMode.Dark,
             systemPrompt = "Keep these instructions",
             reasoningEffort = "high",
@@ -75,7 +75,7 @@ class AetherSettingsStoreTest {
         val dataStore = InMemoryPreferencesDataStore(
             mutablePreferencesOf(
                 stringPreferencesKey("app_settings_json") to serializeAppSettings(stale),
-                stringPreferencesKey("language") to AppLanguage.SimplifiedChinese.storageValue,
+                stringPreferencesKey("language") to AppLanguage.Russian.storageValue,
                 stringPreferencesKey("theme_mode") to AppThemeMode.Dark.storageValue,
                 stringPreferencesKey("system_prompt") to "current prompt",
                 stringPreferencesKey("reasoning_effort") to "high",
@@ -84,7 +84,7 @@ class AetherSettingsStoreTest {
 
         val loaded = AetherSettingsStore(dataStore).load().appSettings
 
-        assertEquals(AppLanguage.SimplifiedChinese, loaded.language)
+        assertEquals(AppLanguage.Russian, loaded.language)
         assertEquals(AppThemeMode.Dark, loaded.themeMode)
         assertEquals("current prompt", loaded.systemPrompt)
         assertEquals("high", loaded.reasoningEffort)

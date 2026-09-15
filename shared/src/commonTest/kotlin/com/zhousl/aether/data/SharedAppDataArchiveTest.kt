@@ -278,7 +278,7 @@ class SharedAppDataArchiveTest {
         assertEquals("openai", settings.piProviderId)
         assertEquals("kept-secret", settings.apiKey)
         assertEquals("kept-model", settings.modelId)
-        assertEquals(AppLanguage.SimplifiedChinese, settings.language)
+        assertEquals(AppLanguage.English, settings.language)
         assertEquals(AppThemeMode.Dark, settings.themeMode)
         assertTrue(settings.privacyPolicyAccepted)
         assertEquals(AppSettings().llmInactivityReconnectTimeoutSeconds, settings.llmInactivityReconnectTimeoutSeconds)

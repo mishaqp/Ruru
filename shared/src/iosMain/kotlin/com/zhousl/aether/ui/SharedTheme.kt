@@ -127,11 +127,7 @@ internal fun SharedAetherTheme(
     }
     val accessibility = rememberPlatformAccessibilityPreferences()
     SideEffect { updateAetherPalette(darkTheme, accessibility.increasedContrast) }
-    val layoutDirection = if (language == AppLanguage.Persian) {
-        LayoutDirection.Rtl
-    } else {
-        LayoutDirection.Ltr
-    }
+    val layoutDirection = LayoutDirection.Ltr
     CompositionLocalProvider(
         LocalLayoutDirection provides layoutDirection,
         LocalReduceMotion provides accessibility.reduceMotion,

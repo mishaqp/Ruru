@@ -4264,7 +4264,7 @@ class AetherViewModel(
                     val newSession = createSession(
                         id = targetSessionId,
                         messages = listOf(userMessage),
-                        title = "New chat",
+                        title = if (current.settings.language == AppLanguage.Russian) "Новый чат" else "New chat",
                         hasCustomTitle = true,
                         selectedModelKey = current.draftSelectedModelKey.ifBlank {
                             resolveDefaultChatModelKey(current.settings, current.providerConfigs)

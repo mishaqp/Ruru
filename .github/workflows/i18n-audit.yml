@@ -23,14 +23,14 @@ jobs:
           exec > >(tee i18n-audit.txt) 2>&1
           echo '=== LOCALE DIRECTORIES ==='
           find shared/src/commonMain/composeResources -maxdepth 1 -type d -name 'values*' -printf '%f\n' | sort
-          echo '=== LANGUAGE / LOCALE REFERENCES ==='
-          rg -n --glob '*.kt' --glob '*.kts' --glob '*.xml' 'AppLanguage|LocaleConfig|localeConfig|languageTag|languageCode|Persian|Farsi|Chinese|Simplified|فارسی|简体|zh-rCN|values-fa|values-zh' app shared || true
-          echo '=== ANDROID/COMPOSE HARD-CODED UI CANDIDATES ==='
-          rg -n --glob '*.kt' 'Text\("[A-Za-z]|contentDescription\s*=\s*"[A-Za-z]|title\s*=\s*"[A-Za-z]|label\s*=\s*"[A-Za-z]|placeholder\s*=\s*"[A-Za-z]' app shared | head -n 1000 || true
+          echo '=== LANGUAGE REFERENCES ==='
+          grep -RInE --include='*.kt' --include='*.kts' --include='*.xml' 'AppLanguage|LocaleConfig|localeConfig|languageTag|languageCode|Persian|Farsi|Chinese|Simplified|فارسی|简体|zh-rCN|values-fa|values-zh' app shared || true
+          echo '=== COMPOSE HARDCODED UI CANDIDATES ==='
+          grep -RInE --include='*.kt' 'Text\("[A-Za-z]|contentDescription[[:space:]]*=[[:space:]]*"[A-Za-z]|title[[:space:]]*=[[:space:]]*"[A-Za-z]|label[[:space:]]*=[[:space:]]*"[A-Za-z]|placeholder[[:space:]]*=[[:space:]]*"[A-Za-z]' app shared | head -n 1200 || true
           echo '=== EXTENSION USER-FACING STRING CANDIDATES ==='
-          rg -n --glob '*.ts' --glob '*.tsx' --glob '*.js' --glob '*.mjs' --glob '!**/node_modules/**' --glob '!**/dist/**' 'description:\s*"[A-Za-z]|title:\s*"[A-Za-z]|label:\s*"[A-Za-z]|placeholder:\s*"[A-Za-z]|message:\s*"[A-Za-z]|name:\s*"[A-Za-z]|text:\s*"[A-Za-z]' extensions pi-bridge | head -n 1600 || true
-          echo '=== LOCALE / LANGUAGE FILES ==='
-          find app shared -type f \( -iname '*locale*' -o -iname '*language*' \) -print | sort
+          grep -RInE --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=dist 'description:[[:space:]]*"[A-Za-z]|title:[[:space:]]*"[A-Za-z]|label:[[:space:]]*"[A-Za-z]|placeholder:[[:space:]]*"[A-Za-z]|message:[[:space:]]*"[A-Za-z]|name:[[:space:]]*"[A-Za-z]|text:[[:space:]]*"[A-Za-z]' extensions pi-bridge | head -n 2000 || true
+          echo '=== ALL APP LANGUAGE DEFINITIONS ==='
+          grep -RIn --include='*.kt' 'AppLanguage' app shared || true
       - uses: actions/upload-artifact@v7
         if: always()
         with:

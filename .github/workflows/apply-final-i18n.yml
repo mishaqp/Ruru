@@ -1,4 +1,5 @@
 name: Apply final localization pass
+# Rerun after restoring the complete archive regression test.
 on:
   push:
     branches: ['i18n/en-ru-only']

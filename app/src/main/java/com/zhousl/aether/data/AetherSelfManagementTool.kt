@@ -199,7 +199,7 @@ class AetherSelfManagementTool(
         ),
         buildAetherToolDefinition(
             name = "aether_extension_manage",
-            description = "List, install, update, remove, or reload Aether/Pi extension packages, or invoke a registered Pi extension command. Package sources use the npm: format, including npm:<name>@file:<absolute-directory> for a local package.",
+            description = "List installed AND loaded Aether/Pi extensions, enable/disable by extension_id, install, update, remove, reload, or invoke a registered command. Loaded means registered, not functionally tested. Changes during a turn take effect on the next turn. Package sources use the npm: format, including npm:<name>@file:<absolute-directory> for a local package.",
             properties = JSONObject().apply {
                 put(
                     "action",
@@ -210,6 +210,7 @@ class AetherSelfManagementTool(
                             JSONArray(
                                 listOf(
                                     "list",
+                                    "set_enabled",
                                     "install_package",
                                     "update_package",
                                     "remove_package",
@@ -227,6 +228,10 @@ class AetherSelfManagementTool(
                         put("description", "npm: package source to install, update, or remove.")
                     },
                 )
+                put("extension_id", JSONObject().put("type", "string")
+                    .put("description", "Exact id from list.installed; required for set_enabled."))
+                put("enabled", JSONObject().put("type", "boolean")
+                    .put("description", "Required for set_enabled. Never change an explicit user choice without a request."))
                 put(
                     "command",
                     JSONObject().apply {
@@ -246,13 +251,13 @@ class AetherSelfManagementTool(
         ),
         buildAetherToolDefinition(
             name = "aether_developer_manage",
-            description = "Read Aether developer diagnostics such as recent diagnostic events or last crash details. Sensitive values are redacted.",
+            description = "Read diagnostics, or run a read-only health_check of extension registration, skills, Termux, and configuration. Does not test notification delivery, Android root grants, vision, or device UI. Does not expose provider secrets.",
             properties = JSONObject().apply {
                 put(
                     "action",
                     JSONObject().apply {
                         put("type", "string")
-                        put("enum", JSONArray(listOf("read_diagnostics")))
+                        put("enum", JSONArray(listOf("read_diagnostics", "health_check")))
                     },
                 )
                 put(
@@ -643,9 +648,10 @@ class AetherSelfManagementTool(
         }
     }
 
-    private fun executeDeveloperManage(argumentsJson: String): String {
+    private suspend fun executeDeveloperManage(argumentsJson: String): String {
         val arguments = parseArguments(argumentsJson) ?: return invalidJson()
         return when (val action = arguments.optString("action").trim().lowercase(Locale.US)) {
+            "health_check" -> executeHealthCheck()
             "read_diagnostics" -> {
                 val include = arguments.optString("include").trim().lowercase(Locale.US).ifBlank { "both" }
                 val maxChars = arguments.optInt("max_chars", DefaultDeveloperLogTailChars)
@@ -671,14 +677,26 @@ class AetherSelfManagementTool(
         return runCatching {
             when (val action = arguments.optString("action").trim().lowercase(Locale.US)) {
                 "list" -> {
-                    val payload = piKernelBridge.listExtensions(sessionId)
-                    val packages = piKernelBridge.listExtensionPackages()
-                    packages.optJSONArray("packages")?.let { payload.put("packages", it) }
+                    val payload = extensionInventory()
                     success(payload) {
                         put(
                             "stdout",
-                            "Found ${payload.optJSONArray("extension_paths")?.length() ?: 0} loaded Pi extensions.",
+                            "Installed: ${payload.optJSONArray("installed")?.length() ?: 0}; registered paths: ${payload.optJSONArray("extension_paths")?.length() ?: 0}. Registration is not a functional test.",
                         )
+                    }
+                }
+
+                "set_enabled" -> {
+                    val id = arguments.optString("extension_id").trim()
+                    require(id.isNotBlank()) { "extension_id is required for set_enabled." }
+                    require(arguments.opt("enabled") is Boolean) { "enabled must be a boolean." }
+                    val enabled = arguments.getBoolean("enabled")
+                    val extension = piExtensionManager.listInstalled().getOrThrow()
+                        .firstOrNull { it.id == id } ?: error("No installed extension matched '$id'.")
+                    piExtensionManager.setEnabled(extension, enabled).getOrThrow()
+                    success(JSONObject().put("extension_id", id).put("enabled", enabled)
+                        .put("effective_on_next_turn", true)) {
+                        put("stdout", "Extension setting saved. Start the next turn, then list to verify registration.")
                     }
                 }
 
@@ -755,6 +773,56 @@ class AetherSelfManagementTool(
         }.getOrElse { throwable ->
             failure(throwable.message ?: "Pi extension operation failed.")
         }
+    }
+
+    private suspend fun extensionInventory(): JSONObject {
+        val payload = piKernelBridge.listExtensions(sessionId)
+        val installed = piExtensionManager.listInstalled().getOrThrow()
+        val paths = payload.optJSONArray("extension_paths") ?: JSONArray()
+        val registeredPaths = (0 until paths.length()).map { normalizeImportedExtensionPath(paths.optString(it)) }
+        payload.put("installed", JSONArray().apply {
+            installed.forEach { extension ->
+                val root = normalizeImportedExtensionPath(extension.installedPath).trimEnd('/')
+                val registered = root.isNotBlank() && registeredPaths.any {
+                    it == root || it.startsWith("$root/")
+                }
+                put(JSONObject()
+                    .put("id", extension.id).put("name", extension.name)
+                    .put("version", extension.version).put("kind", extension.kind.name)
+                    .put("path", extension.installedPath).put("enabled", extension.isEnabled)
+                    .put("pi_registered", registered).put("functionally_tested", false)
+                    .put("pi_entrypoints", extension.extensionCount)
+                    .put("ui_entrypoints", extension.aetherExtensionCount)
+                    .put("native_entrypoints", extension.nativeEntrypointCount)
+                    .put("skill_count", extension.skillCount))
+            }
+        })
+        payload.put("inventory_note", "Installed, enabled and Pi-registered are separate states. UI-only extensions need no Pi tool. An empty MCP server list is unconfigured, not broken.")
+        return payload
+    }
+
+    private suspend fun executeHealthCheck(): String {
+        val settings = settingsRepository.settings.first()
+        val output = JSONObject().put("scope", "read-only; current session; no device UI automation")
+            .put("general", generalSettingsJson(settings))
+            .put("reliability_config_only", reliabilitySettingsJson(settings))
+            .put("agent_mode_cached_state", agentModeSettingsJson(settings))
+            .put("scheduled_task_count", scheduledTaskManager.snapshot().size)
+            .put("diagnostics", developerSummaryJson())
+        val extensions = runCatching { extensionInventory() }
+        output.put("extensions", extensions.getOrElse {
+            JSONObject().put("status", "UNKNOWN").put("reason", "Extension inventory unavailable; inspect diagnostics.")
+        })
+        output.put("skills", skillsJson(extensionsRepository.extensionState.first().installedSkills))
+        val termux = runCatching { bashTool.inspectSetup() }
+        output.put("termux", termux.fold(
+            onSuccess = { termuxSetupStateJson(it) },
+            onFailure = { JSONObject().put("status", "UNKNOWN").put("reason", "Termux probe failed.") },
+        ))
+        output.put("root_note", "Alpine uid 0 is proot identity, not an Android root grant. Agent Mode authorization and Termux root setup are independent.")
+        output.put("storage_note", "Use /workspace and attachments/import/export for Android documents. /sdcard is not bound into Alpine by default.")
+        output.put("not_tested", JSONArray(listOf("notification_delivery", "background_survival", "browser_navigation", "vision", "screen_localization", "mcp_connections", "subagent_model_request")))
+        return success(output) { put("stdout", "Read-only runtime health check completed; untested capabilities remain unverified.") }
     }
 
     private fun JSONObject.requiredExtensionPackageSource(action: String): String =

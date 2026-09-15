@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="shared_extensions_security_warning">Пакеты расширений выполняются как доверенный скриптовый код с широким доступом к агенту, хост-приложению, локальной среде выполнения и рабочей области.</string>
-    <string name="shared_extensions_runtime_summary">Пакетов: %1$d · скриптовых точек входа: %2$d · загружено UI-расширений Aether: %3$d</string>
+    <string name="shared_extensions_runtime_summary">Пакетов: %1$d · скриптовых точек входа: %2$d · загружено UI-расширений Ruru: %3$d</string>
     <string name="shared_extensions_runtime_enabled">Включено средой выполнения скриптов</string>
     <string name="shared_extensions_script_runtime_unavailable">Расширения-скрипты недоступны на этой платформе.</string>
     <string name="shared_extensions_manual_install">Установить источник npm</string>
@@ -11,14 +11,14 @@
     <string name="shared_extensions_import_description">Импорт расширения</string>
     <string name="shared_extensions_imported">Импортировано</string>
     <string name="shared_extensions_installed_path">Путь установки</string>
-    <string name="shared_extensions_script_resources">Расширений Pi: %1$d · UI-расширений Aether: %2$d · навыков: %3$d · промптов: %4$d · тем: %5$d</string>
+    <string name="shared_extensions_script_resources">Расширений Pi: %1$d · UI-расширений Ruru: %2$d · навыков: %3$d · промптов: %4$d · тем: %5$d</string>
     <string name="shared_extensions_loaded_entries">Загружено записей: %1$d</string>
     <string name="shared_extensions_pi_entries_label">Расширения Pi</string>
-    <string name="shared_extensions_aether_entries_label">UI-расширения Aether</string>
+    <string name="shared_extensions_aether_entries_label">UI-расширения Ruru</string>
     <string name="shared_extensions_skills_label">Навыки</string>
     <string name="shared_extensions_prompts_label">Промпты</string>
     <string name="shared_extensions_themes_label">Темы</string>
-    <string name="shared_extensions_loaded_entries_label">Загруженные UI-записи Aether</string>
+    <string name="shared_extensions_loaded_entries_label">Загруженные UI-записи Ruru</string>
     <string name="shared_extensions_runtime_error_count">Ошибок среды скриптов: %1$d</string>
     <string name="shared_extensions_remove_title">Удалить расширение?</string>
     <string name="shared_extensions_remove_body">%1$s будет удалено из локальной среды выполнения. Действие необратимо.</string>
@@ -26,7 +26,7 @@
     <string name="shared_extensions_import_too_large">Выбранное расширение больше 32 МБ.</string>
     <string name="shared_extensions_zip_unsafe">Архив расширения содержит небезопасный путь.</string>
     <string name="shared_extensions_zip_invalid">Архив должен содержать пакет скриптового расширения или индексный файл JavaScript/TypeScript.</string>
-    <string name="shared_extensions_platform_compatibility">Похоже, этому пакету нужна настольная ОС или архитектура CPU, недоступные в среде Alpine на iOS в Aether.</string>
+    <string name="shared_extensions_platform_compatibility">Похоже, этому пакету нужна настольная ОС или архитектура CPU, недоступные в среде Alpine на iOS в Ruru.</string>
     <string name="shared_extensions_operation_in_progress">Применение изменений расширений…</string>
     <string name="shared_extensions_refresh_complete">Расширения обновлены.</string>
 </resources>

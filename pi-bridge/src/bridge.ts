@@ -92,6 +92,7 @@ import {
   loadAetherAppExtensions,
 } from "./aether-extensions.js";
 import { bridgeDebug, bridgeDebugEnabled, bridgeDiagnostic, elapsedMillis } from "./debug.js";
+import { ensureExtensionPackageDependencies, packageRootForExtensionPath } from "./extension-dependencies.js";
 import { reserveProtocolStdout, writeProtocolFrame } from "./protocol-output.js";
 
 reserveProtocolStdout();
@@ -187,6 +188,7 @@ interface AgentSessionState {
   resourceLoader: DefaultResourceLoader;
   settingsManager: SettingsManager;
   configuredExtensionPaths: string[];
+  extensionSetupErrors: { path: string; error: string }[];
   pendingReload: boolean;
   pendingRecreate: boolean;
   currentRequestId: string;
@@ -2420,6 +2422,28 @@ async function resolveNativeExtensionSet(
   };
 }
 
+/** The SDK discovers entries but does not install copied Aether package dependencies.
+ * Share the same guarded installer as the UI loader; concurrent UI/chat loads deduplicate.
+ * Never install dependencies in arbitrary workspace ancestors.
+ */
+async function prepareNativeExtensionDependencies(
+  extensionPaths: string[],
+  errors: { path: string; error: string }[],
+): Promise<string[]> {
+  const root = path.join(os.homedir(), ".aether", "extensions");
+  const ready: string[] = [];
+  for (const extensionPath of extensionPaths) {
+    try {
+      const packageRoot = packageRootForExtensionPath(extensionPath, root);
+      if (packageRoot) await ensureExtensionPackageDependencies(packageRoot);
+      ready.push(extensionPath);
+    } catch (error) {
+      errors.push({ path: extensionPath, error: errorMessageWithCause(error).slice(-4000) });
+    }
+  }
+  return ready;
+}
+
 async function createNativeAgentSession(
   sessionId: string,
   payload: JsonObject,
@@ -2446,11 +2470,12 @@ async function createNativeAgentSession(
         disabledPackageSources: stringArray(payload.disabled_package_sources),
       },
     );
+  const extensionSetupErrors: { path: string; error: string }[] = [];
   const resourceLoader = new DefaultResourceLoader({
     cwd: workspaceDirectory,
     agentDir,
     settingsManager,
-    additionalExtensionPaths,
+    additionalExtensionPaths: await prepareNativeExtensionDependencies(additionalExtensionPaths, extensionSetupErrors),
     extensionFactories: platform === "android" ? [aetherChromeExtensionFactory] : [],
     additionalSkillPaths: stringArray(payload.skill_paths),
     appendSystemPrompt: [asString(payload.system_prompt)].filter(Boolean),
@@ -2488,6 +2513,7 @@ async function createNativeAgentSession(
     resourceLoader,
     settingsManager,
     configuredExtensionPaths,
+    extensionSetupErrors,
     pendingReload: false,
     pendingRecreate: false,
     currentRequestId: "",
@@ -3065,7 +3091,7 @@ function extensionRuntimePayload(state: AgentSessionState): JsonObject {
     workspace_directory: state.workspaceDirectory,
     extension_paths: runner.getExtensionPaths(),
     discovered_paths: loaded.extensions.map((extension) => extension.path),
-    errors: loaded.errors,
+    errors: [...state.extensionSetupErrors, ...loaded.errors],
     tools: runner.getAllRegisteredTools().map((tool) => ({
       name: tool.definition.name,
       description: tool.definition.description,

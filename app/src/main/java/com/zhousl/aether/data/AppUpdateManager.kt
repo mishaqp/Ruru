@@ -47,8 +47,8 @@ class AppUpdateManager(
             val body = response.body?.string().orEmpty()
             val releaseJson = JSONObject(body)
             val tagName = releaseJson.optString("tag_name").trim()
-            val versionName = tagName.versionCore().ifBlank {
-                releaseJson.optString("name").versionCore()
+            val versionName = tagName.releaseVersionName().ifBlank {
+                releaseJson.optString("name").releaseVersionName()
             }
             if (versionName.isBlank()) {
                 error("Latest release did not include a version.")
@@ -210,8 +210,15 @@ fun isVersionNewer(
             return remotePart > currentPart
         }
     }
-    return false
+    return remoteVersion.ruruRevision() > currentVersion.ruruRevision()
 }
+
+internal fun String.releaseVersionName(): String =
+    trim().removePrefix("v").removePrefix("V").substringBefore('+').trim()
+
+private fun String.ruruRevision(): Int =
+    Regex("""^\d+\.\d+\.\d+-ruru\.(\d+)$""")
+        .matchEntire(releaseVersionName())?.groupValues?.get(1)?.toIntOrNull() ?: 0
 
 private fun String.versionCore(): String =
     trim()

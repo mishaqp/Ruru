@@ -129,15 +129,6 @@
     <string name="chat_code_chip">کد</string>
     <string name="chat_help_me_write_chip">کمکم کن بنویسم</string>
     <string name="chat_summarize_file_chip">خلاصه کردن فایل</string>
-    <string name="chat_analyze_image_prompt">این تصویر را تجزیه و تحلیل کنید و جزئیات مهم را شرح دهید.</string>
-    <string name="chat_code_prompt">به من کمک کنید این کد را بنویسم یا اشکال زدایی کنم:</string>
-    <string name="chat_help_write_prompt">به من کمک کنید تا یک پیام واضح و صیقلی درباره آن بنویسم</string>
-    <string name="chat_summarize_file_prompt">این فایل را خلاصه کنید و نکات کلیدی را فهرست کنید.</string>
-    <string name="chat_stop_response">پاسخ را متوقف کنید</string>
-    <string name="chat_previous_branch">شاخه پاسخ قبلی</string>
-    <string name="chat_next_branch">شاخه پاسخ بعدی</string>
-    <string name="chat_delete_session_title">این جلسه حذف شود؟</string>
-    <string name="chat_delete_session_message">این جلسه و فایل‌های فضای کاری آن برای همیشه حذف خواهند شد. این عمل قابل واگرد نیست.</string>
     <string name="chat_thinking">فکر کردن</string>
     <string name="chat_context_compacted">متن فشرده شده است</string>
     <string name="chat_compacting_context">بافت فشرده</string>
@@ -794,7 +785,6 @@
     <string name="settings_alpine_subtitle_ready">لینوکس VM داخلی آماده است</string>
     <string name="settings_alpine_subtitle_setup">راه اندازی لینوکس VM داخلی</string>
     <string name="settings_runtime_defaults">پیش فرض زمان اجرا</string>
-    <string name="settings_personalization_summary">دستورالعمل های سفارشی</string>
     <string name="settings_runtime_defaults_hint">زمان اجرای محلی پیش فرض را انتخاب کنید</string>
     <string name="settings_runtime_environment">محیط زمان اجرا</string>
     <string name="settings_runtime_environment_default_help">این را به عنوان پیش‌فرض بگذارید تا از پیش‌فرض زمان اجرا کاربر پیروی کند.</string>

@@ -5,10 +5,13 @@ on:
     paths: ['.github/workflows/i18n-audit.yml']
 permissions:
   contents: read
+concurrency:
+  group: ruru-localization-audit
+  cancel-in-progress: true
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
         with:
@@ -17,60 +20,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY' | tee i18n-audit.txt
-          from pathlib import Path
-          import os, re
-
-          SKIP={'.git','build','node_modules','dist','.gradle'}
-          def files(base, suffixes):
-              for root, dirs, names in os.walk(base):
-                  dirs[:] = [d for d in dirs if d not in SKIP]
-                  for name in names:
-                      p=Path(root)/name
-                      if p.suffix in suffixes: yield p
-
-          print('=== LOCALE DIRECTORIES ===')
-          root=Path('shared/src/commonMain/composeResources')
-          for p in sorted(root.glob('values*')):
-              if p.is_dir(): print(p.name)
-
-          print('\n=== LANGUAGE / LOCALE REFERENCES ===')
-          lang=re.compile(r'AppLanguage|LocaleConfig|localeConfig|languageTag|languageCode|Persian|Farsi|Chinese|Simplified|فارسی|简体|zh-rCN|values-fa|values-zh|["\']fa["\']|["\']zh(?:-CN)?["\']')
-          for base in ('app','shared'):
-              for p in files(base,{'.kt','.kts','.xml','.json','.plist','.gradle'}):
-                  for n,line in enumerate(p.read_text(errors='ignore').splitlines(),1):
-                      if lang.search(line): print(f'{p}:{n}:{line.strip()}')
-
-          print('\n=== ANDROID/COMPOSE HARD-CODED UI CANDIDATES ===')
-          ui=re.compile(r'(?:Text|title|label|contentDescription|placeholder|supportingText|message|description)\s*[=(][^\n]*["\'][A-Za-z][^"\']*["\']')
-          count=0
-          for base in ('app','shared'):
-              for p in files(base,{'.kt'}):
-                  for n,line in enumerate(p.read_text(errors='ignore').splitlines(),1):
-                      if ui.search(line):
-                          print(f'{p}:{n}:{line.strip()}'); count+=1
-                          if count>=1200: break
-                  if count>=1200: break
-              if count>=1200: break
-
-          print('\n=== EXTENSION USER-FACING STRING CANDIDATES ===')
-          ext=re.compile(r'(?:title|label|description|message|placeholder|text|name|command|notify|error|status)\s*[:=]\s*[`"\'][A-Za-z][^`"\']*[`"\']')
-          count=0
-          for base in ('extensions','pi-bridge'):
-              for p in files(base,{'.ts','.tsx','.js','.mjs','.json'}):
-                  for n,line in enumerate(p.read_text(errors='ignore').splitlines(),1):
-                      if ext.search(line):
-                          print(f'{p}:{n}:{line.strip()}'); count+=1
-                          if count>=1600: break
-                  if count>=1600: break
-              if count>=1600: break
-
-          print('\n=== XML / LOCALE FILES OUTSIDE COMPOSE RESOURCES ===')
-          for base in ('app','shared'):
-              for p in files(base,{'.kt','.xml','.plist'}):
-                  if 'locale' in p.name.lower() or 'language' in p.name.lower(): print(p)
-          PY
+          exec > >(tee i18n-audit.txt) 2>&1
+          echo '=== LOCALE DIRECTORIES ==='
+          find shared/src/commonMain/composeResources -maxdepth 1 -type d -name 'values*' -printf '%f\n' | sort
+          echo '=== LANGUAGE / LOCALE REFERENCES ==='
+          rg -n --glob '*.kt' --glob '*.kts' --glob '*.xml' 'AppLanguage|LocaleConfig|localeConfig|languageTag|languageCode|Persian|Farsi|Chinese|Simplified|فارسی|简体|zh-rCN|values-fa|values-zh' app shared || true
+          echo '=== ANDROID/COMPOSE HARD-CODED UI CANDIDATES ==='
+          rg -n --glob '*.kt' 'Text\("[A-Za-z]|contentDescription\s*=\s*"[A-Za-z]|title\s*=\s*"[A-Za-z]|label\s*=\s*"[A-Za-z]|placeholder\s*=\s*"[A-Za-z]' app shared | head -n 1000 || true
+          echo '=== EXTENSION USER-FACING STRING CANDIDATES ==='
+          rg -n --glob '*.ts' --glob '*.tsx' --glob '*.js' --glob '*.mjs' --glob '!**/node_modules/**' --glob '!**/dist/**' 'description:\s*"[A-Za-z]|title:\s*"[A-Za-z]|label:\s*"[A-Za-z]|placeholder:\s*"[A-Za-z]|message:\s*"[A-Za-z]|name:\s*"[A-Za-z]|text:\s*"[A-Za-z]' extensions pi-bridge | head -n 1600 || true
+          echo '=== LOCALE / LANGUAGE FILES ==='
+          find app shared -type f \( -iname '*locale*' -o -iname '*language*' \) -print | sort
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: ruru-i18n-audit
           path: i18n-audit.txt

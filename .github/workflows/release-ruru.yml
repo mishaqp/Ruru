@@ -1,0 +1,276 @@
+name: Release Ruru APK
+
+# Produces the single installable Android artifact for Ruru:
+#   Ruru-v<version>-arm64-v8a-release.apk
+#
+# Android only. No iOS/macOS job, no nightly variant, no debug signing.
+# Signing material comes from repository secrets and is never committed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'versionName, e.g. 0.1.0-ruru.1'
+        required: true
+        default: '0.1.0-ruru.1'
+      version_code:
+        description: 'versionCode (major*1000000 + minor*10000 + patch*100 + revision)'
+        required: true
+        default: '10001'
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-ruru-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: enhanced
+          cache-read-only: false
+
+      # Keep asking only for 'platform-tools': the 'tools' package no longer exists
+      # in current cmdline-tools and makes sdkmanager exit 1 before Gradle runs.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        env:
+          INPUT_VERSION_NAME: ${{ inputs.version_name }}
+          INPUT_VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+            version_name="${tag#v}"
+          else
+            tag="v${INPUT_VERSION_NAME}"
+            version_name="${INPUT_VERSION_NAME}"
+          fi
+
+          version_code="${INPUT_VERSION_CODE}"
+          if [[ -z "${version_code}" || "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            core="${version_name%%-*}"
+            IFS='.' read -r major minor patch <<< "$core"
+            major="${major:-0}"; minor="${minor:-0}"; patch="${patch:-0}"
+            revision=0
+            if [[ "$version_name" == *-ruru.* ]]; then
+              revision="${version_name##*-ruru.}"
+            fi
+            version_code=$(( major * 1000000 + minor * 10000 + patch * 100 + revision ))
+          fi
+
+          if [[ ! "${version_name}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "versionName must start with a numeric core like 0.1.0: got '${version_name}'" >&2
+            exit 1
+          fi
+
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "name=${version_name}" >> "$GITHUB_OUTPUT"
+          echo "code=${version_code}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=${tag} versionName=${version_name} versionCode=${version_code}"
+
+      - name: Restore release keystore
+        shell: bash
+        env:
+          RURU_KEYSTORE_BASE64: ${{ secrets.RURU_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${RURU_KEYSTORE_BASE64}" ]]; then
+            echo "::error::RURU_KEYSTORE_BASE64 is not configured. Add the Ruru signing secrets first."
+            exit 1
+          fi
+          signing_dir="$RUNNER_TEMP/ruru-signing"
+          mkdir -p "$signing_dir"
+          printf '%s' "$RURU_KEYSTORE_BASE64" | base64 --decode > "$signing_dir/ruru-release.jks"
+          ls -l "$signing_dir/ruru-release.jks"
+
+      - name: Build release APK (arm64-v8a only)
+        shell: bash
+        env:
+          RURU_KEYSTORE_FILE: ${{ runner.temp }}/ruru-signing/ruru-release.jks
+          RURU_KEYSTORE_PASSWORD: ${{ secrets.RURU_KEYSTORE_PASSWORD }}
+          RURU_KEY_ALIAS: ${{ secrets.RURU_KEY_ALIAS }}
+          RURU_KEY_PASSWORD: ${{ secrets.RURU_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          ./gradlew :app:assembleRelease --stacktrace \
+            -Pruru.versionName="${{ steps.version.outputs.name }}" \
+            -Pruru.versionCode="${{ steps.version.outputs.code }}"
+
+      - name: Locate and inspect APK
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$(find app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          if [[ -z "$apk" ]]; then
+            echo "::error::assembleRelease produced no APK"
+            exit 1
+          fi
+          echo "built=${apk}" >> "$GITHUB_OUTPUT"
+          ls -l "$apk"
+
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          build_tools="$(find "$sdk/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          echo "build_tools=${build_tools}" >> "$GITHUB_OUTPUT"
+          echo "Using build-tools: $build_tools"
+
+      - name: Verify signature
+        shell: bash
+        env:
+          APK: ${{ steps.apk.outputs.built }}
+        run: |
+          set -euo pipefail
+          "${{ steps.apk.outputs.build_tools }}/apksigner" verify --verbose --print-certs "$APK" | tee apksigner.txt
+          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" apksigner.txt \
+            || grep -q "Verified using v1 scheme" apksigner.txt
+          echo "APK is signed."
+
+      - name: Record signing certificate SHA-256
+        id: cert
+        shell: bash
+        run: |
+          set -euo pipefail
+          cert="$(grep -m1 -E 'Signer #1 certificate SHA-256 digest:' apksigner.txt | sed 's/.*digest: *//' | tr -d ' ' | tr 'A-Z' 'a-z')"
+          if [[ -z "$cert" ]]; then
+            echo "::error::Could not read the signing certificate fingerprint"
+            exit 1
+          fi
+          echo "$cert" > RURU_SIGNING_CERT_SHA256.txt
+          echo "sha256=${cert}" >> "$GITHUB_OUTPUT"
+          echo "Signing certificate SHA-256: ${cert}"
+
+      - name: Verify ABI, package name and testOnly flag
+        shell: bash
+        env:
+          APK: ${{ steps.apk.outputs.built }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, sys, zipfile
+          apk = os.environ["APK"]
+          z = zipfile.ZipFile(apk)
+          names = z.namelist()
+          libs = [n for n in names if n.startswith("lib/")]
+          abis = sorted({n.split("/")[1] for n in libs})
+
+          forbidden = [a for a in abis if a != "arm64-v8a"]
+          if forbidden:
+              print(f"::error::APK contains forbidden ABIs: {forbidden}")
+              sys.exit(1)
+          if "arm64-v8a" not in abis:
+              print("::error::APK contains no arm64-v8a native libraries")
+              sys.exit(1)
+          print(f"ABI check OK, lib/ entries: {sorted(libs)}")
+
+          blob = z.read("AndroidManifest.xml")
+          if b"testOnly" in blob or "testOnly".encode("utf-16-le") in blob:
+              print("::error::AndroidManifest declares testOnly")
+              sys.exit(1)
+          print("testOnly check OK: not declared")
+          print(f"APK entries: {len(names)}")
+          PY
+
+      - name: Verify package name and version from the APK
+        shell: bash
+        env:
+          APK: ${{ steps.apk.outputs.built }}
+        run: |
+          set -euo pipefail
+          bt="${{ steps.apk.outputs.build_tools }}"
+          badging=""
+          if [[ -x "$bt/aapt2" ]]; then
+            badging="$("$bt/aapt2" dump badging "$APK" 2>/dev/null || true)"
+          fi
+          if [[ -z "$badging" && -x "$bt/aapt" ]]; then
+            badging="$("$bt/aapt" dump badging "$APK" 2>/dev/null || true)"
+          fi
+          echo "$badging" | head -n 5
+          echo "$badging" | grep -q "package: name='com.mishaqp.ruru'" \
+            || { echo "::error::unexpected package name"; exit 1; }
+          echo "$badging" | grep -q "versionName='${{ steps.version.outputs.name }}'" \
+            || { echo "::error::unexpected versionName"; exit 1; }
+          echo "Package and version check OK."
+
+      - name: Rename APK
+        id: rename
+        shell: bash
+        env:
+          APK: ${{ steps.apk.outputs.built }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/release
+          out="dist/release/Ruru-v${{ steps.version.outputs.name }}-arm64-v8a-release.apk"
+          cp "$APK" "$out"
+          sha256sum "$out" | tee "$out.sha256"
+          echo "file=${out}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: Ruru-${{ steps.version.outputs.name }}-arm64-v8a-release
+          path: |
+            dist/release/*.apk
+            dist/release/*.sha256
+            RURU_SIGNING_CERT_SHA256.txt
+          retention-days: 90
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Ruru ${{ steps.version.outputs.name }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          draft: false
+          prerelease: false
+          files: |
+            dist/release/*.apk
+            dist/release/*.sha256
+            RURU_SIGNING_CERT_SHA256.txt
+          body: |
+            ## Ruru ${{ steps.version.outputs.name }}
+
+            Signed release build of Ruru for Android (arm64-v8a only).
+
+            | | |
+            | --- | --- |
+            | applicationId | `com.mishaqp.ruru` |
+            | versionName | `${{ steps.version.outputs.name }}` |
+            | versionCode | `${{ steps.version.outputs.code }}` |
+            | ABI | `arm64-v8a` |
+            | Signing cert SHA-256 | `${{ steps.cert.outputs.sha256 }}` |
+
+            The signing certificate fingerprint above is permanent: every future
+            Ruru build is signed with the same key, so updates install over the
+            previous version and keep app data.
+
+            Built from commit `${{ github.sha }}` by
+            [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).

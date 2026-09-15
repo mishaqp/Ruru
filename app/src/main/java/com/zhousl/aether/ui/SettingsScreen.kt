@@ -6787,7 +6787,7 @@ private fun AboutPage(
         Spacer(Modifier.height(24.dp))
 
         SettingsCardGroup {
-            AboutInfoRow(label = stringResource(R.string.settings_author), value = "Zhou-Shilin")
+            AboutInfoRow(label = stringResource(R.string.settings_author), value = "mishaqp")
             CardDivider()
             AboutInfoRow(label = stringResource(R.string.settings_version), value = releaseLabel)
             CardDivider()

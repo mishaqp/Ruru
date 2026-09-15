@@ -45,6 +45,7 @@ import {
   ensureExtensionPackageDependencies,
   packageRootForExtensionPath,
 } from "./extension-dependencies.js";
+import { localizeAetherUiSnapshot } from "./aether-ui-i18n.js";
 
 export interface AetherExtensionTransport {
   requestHost(method: string, args: AetherJsonObject): Promise<AetherJsonObject>;
@@ -1434,7 +1435,7 @@ async function aetherAppExtensionSnapshotUnlocked(
       tree: await renderRegisteredMessage(registration, message),
     });
   }
-  return {
+  return localizeAetherUiSnapshot({
     api_version: AETHER_API_VERSION,
     version: runtimeVersion,
     extensions: runtime.extensions.map((extension) => ({
@@ -1451,7 +1452,7 @@ async function aetherAppExtensionSnapshotUnlocked(
     custom_messages: customMessages,
     event_names: [...runtime.events.keys()].sort(),
     errors: runtime.errors,
-  };
+  }, hostContext);
 }
 
 export async function aetherAppExtensionSnapshot(

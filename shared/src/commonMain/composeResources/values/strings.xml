@@ -192,12 +192,8 @@
     <string name="settings_language">Language</string>
     <string name="settings_language_description">Choose the app language.</string>
     <string name="language_english" translatable="false">English</string>
-    <string name="language_simplified_chinese" translatable="false">简体中文</string>
-    <string name="language_persian" translatable="false">فارسی</string>
     <string name="language_russian" translatable="false">Русский</string>
     <string name="settings_language_english_interface">English interface</string>
-    <string name="settings_language_simplified_chinese_interface">Simplified Chinese interface</string>
-    <string name="settings_language_persian_interface">Persian interface</string>
     <string name="settings_language_russian_interface">Russian interface</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_description">Choose the app appearance.</string>

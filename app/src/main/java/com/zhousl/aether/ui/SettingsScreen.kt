@@ -340,16 +340,12 @@ private val StatisticsNeutralChartColor = Color(0xFFDCE4FF)
 @Composable
 private fun settingsLanguageDisplayName(language: AppLanguage): String = when (language) {
     AppLanguage.English -> stringResource(R.string.language_english)
-    AppLanguage.SimplifiedChinese -> stringResource(R.string.language_simplified_chinese)
-    AppLanguage.Persian -> stringResource(R.string.language_persian)
     AppLanguage.Russian -> stringResource(R.string.language_russian)
 }
 
 @Composable
 private fun settingsLanguageSubtitle(language: AppLanguage): String = when (language) {
     AppLanguage.English -> stringResource(R.string.settings_language_english_interface)
-    AppLanguage.SimplifiedChinese -> stringResource(R.string.settings_language_simplified_chinese_interface)
-    AppLanguage.Persian -> stringResource(R.string.settings_language_persian_interface)
     AppLanguage.Russian -> stringResource(R.string.settings_language_russian_interface)
 }
 

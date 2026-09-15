@@ -48,7 +48,7 @@ class NativeSettingsBridgeTest {
         val snapshot = Json.parseToJsonElement(
             buildNativeSettingsSnapshot(
                 settings = AppSettings(
-                    language = AppLanguage.SimplifiedChinese,
+                    language = AppLanguage.Russian,
                     themeMode = AppThemeMode.Dark,
                 ),
                 providerConfigs = emptyList(),
@@ -138,7 +138,7 @@ class NativeSettingsBridgeTest {
             )
         )
 
-        assertEquals(AppLanguage.Persian, updated.language)
+        assertEquals(AppLanguage.Russian, updated.language)
         assertEquals(AppThemeMode.Light, updated.themeMode)
         assertEquals(30, updated.llmInactivityReconnectTimeoutSeconds)
         assertFalse(updated.keepTasksRunningInBackground)

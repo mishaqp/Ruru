@@ -21,7 +21,7 @@ class AppSettingsSerializationTest {
             defaultRuntimeId = LocalRuntimeId.Alpine,
             alpinePackageProfiles = mapOf("chrome" to PackageProfileState("chrome", installed = true)),
             alpineEnvironmentVariables = listOf(AlpineEnvironmentVariable("A", "B")),
-            language = AppLanguage.SimplifiedChinese,
+            language = AppLanguage.Russian,
             themeMode = AppThemeMode.Dark,
             defaultChatModelKey = "provider/chat-model",
             defaultTitleModelKey = "provider/title-model",
@@ -35,6 +35,15 @@ class AppSettingsSerializationTest {
         )
 
         assertEquals(settings, parseAppSettings(serializeAppSettings(settings)))
+    }
+
+    @Test
+    fun removedLocalesFallBackToSupportedEnglish() {
+        assertEquals(AppLanguage.English, AppLanguage.fromStorage("zh-CN", AppLanguage.English))
+        assertEquals(AppLanguage.English, AppLanguage.fromStorage("fa", AppLanguage.English))
+        assertEquals(AppLanguage.English, appLanguageForTag("zh-CN"))
+        assertEquals(AppLanguage.English, appLanguageForTag("fa-IR"))
+        assertEquals(AppLanguage.Russian, appLanguageForTag("ru-RU"))
     }
 
     @Test

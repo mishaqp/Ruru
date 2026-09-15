@@ -1084,4 +1084,11 @@
     <string name="file_manager_unable_download_file">Unable to download the file.</string>
     <string name="file_manager_unable_open_file">Unable to open file.</string>
     <string name="file_manager_unable_save_file">Unable to save file.</string>
+    <!-- Showcase playback -->
+    <string name="showcase_replay_controls">Replay controls</string>
+    <string name="showcase_replay_from_beginning">Replay from beginning</string>
+    <string name="showcase_resume">Resume</string>
+    <string name="showcase_pause">Pause</string>
+    <string name="showcase_show_completed_session">Show completed session</string>
+
 </resources>

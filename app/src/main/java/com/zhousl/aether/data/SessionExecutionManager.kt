@@ -198,6 +198,16 @@ class SessionExecutionManager(
     private val _showcaseStates = MutableStateFlow<Map<String, ShowcaseReplayState>>(emptyMap())
     val showcaseStates = _showcaseStates.asStateFlow()
 
+    private fun localizedUiText(english: String, russian: String): String =
+        if (currentSettings.value.language == AppLanguage.Russian) russian else english
+
+    private fun reasoningSummarySystemPrompt(): String =
+        ReasoningSummarySystemPrompt + if (currentSettings.value.language == AppLanguage.Russian) {
+            " Write the user-visible title and detail in Russian."
+        } else {
+            " Write the user-visible title and detail in English."
+        }
+
     fun replayShowcase(sessionId: String, restoreOnly: Boolean = false) {
         if (!com.zhousl.aether.BuildConfig.SHOWCASE_MODE || !ShowcaseCatalog.isSession(sessionId)) return
         val previous = showcaseJobs[sessionId]
@@ -2249,7 +2259,7 @@ class SessionExecutionManager(
             val updatedChunks = if (existingChunk == null) {
                 block.trace.chunks + ReasoningSummaryChunk(
                     id = chunkId,
-                    title = "Reasoning",
+                    title = localizedUiText("Reasoning", "Рассуждение"),
                     detail = updatedDetail,
                     isPending = false,
                     createdAtMillis = now,
@@ -2454,7 +2464,7 @@ class SessionExecutionManager(
         }
         val result = piCompletionClient?.completeOnce(
             settings = titleSettings,
-            systemPrompt = ReasoningSummarySystemPrompt,
+            systemPrompt = reasoningSummarySystemPrompt(),
             messages = listOf(
                 LlmMessage(
                     role = "user",
@@ -2476,10 +2486,10 @@ class SessionExecutionManager(
             .joinToString(" ")
             .replace(Regex("\\s+"), " ")
         return ReasoningSummary(
-            title = "Thinking through the next step",
+            title = localizedUiText("Thinking through the next step", "Продумываю следующий шаг"),
             detail = compact
                 .take(ReasoningSummaryDetailMaxChars)
-                .ifBlank { "Preparing the next action." },
+                .ifBlank { localizedUiText("Preparing the next action.", "Готовлю следующее действие.") },
         )
     }
 

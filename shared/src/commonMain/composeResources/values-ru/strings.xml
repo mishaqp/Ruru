@@ -1084,4 +1084,11 @@
     <string name="file_manager_unable_download_file">Не удалось скачать файл.</string>
     <string name="file_manager_unable_open_file">Не удалось открыть файл.</string>
     <string name="file_manager_unable_save_file">Не удалось сохранить файл.</string>
+    <!-- Showcase playback -->
+    <string name="showcase_replay_controls">Управление воспроизведением</string>
+    <string name="showcase_replay_from_beginning">Воспроизвести с начала</string>
+    <string name="showcase_resume">Продолжить</string>
+    <string name="showcase_pause">Пауза</string>
+    <string name="showcase_show_completed_session">Показать завершённую сессию</string>
+
 </resources>

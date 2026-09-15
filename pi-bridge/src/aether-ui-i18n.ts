@@ -129,6 +129,7 @@ const RU_TEXT: Readonly<Record<string, string>> = {
 
   // Web Access.
   "Web search tools": "Инструменты веб-поиска",
+  "Master switch for web search and source verification": "Главный переключатель веб-поиска и проверки источников",
   "Register search and source-check tools after the next extension reload.": "Зарегистрировать инструменты поиска и проверки источников после следующей перезагрузки расширений.",
   "Default search provider": "Провайдер поиска по умолчанию",
   "Used whenever a tool call leaves provider on Auto.": "Используется, когда для вызова инструмента выбран провайдер «Авто».",

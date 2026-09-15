@@ -1,0 +1,23 @@
+name: Runtime audit source snapshot
+on:
+  push:
+    branches: ['fix/runtime-audit-ruru-2']
+    paths: ['.github/workflows/runtime-audit-source.yml']
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Archive tracked source only
+        run: git archive --format=tar.gz --output=source.tar.gz HEAD
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ruru-audit-source
+          path: source.tar.gz
+          retention-days: 1
+          if-no-files-found: error

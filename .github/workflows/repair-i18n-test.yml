@@ -1,0 +1,42 @@
+name: Repair i18n archive regression test
+on:
+  push:
+    branches: ['i18n/en-ru-only']
+    paths: ['.github/workflows/repair-i18n-test.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Restore verified full test file and change one assertion
+        shell: bash
+        run: |
+          set -euo pipefail
+          file='shared/src/commonTest/kotlin/com/zhousl/aether/data/SharedAppDataArchiveTest.kt'
+          git show a2038153d2396838dacc1c16354c32684dfcb74a:"$file" > "$file"
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('shared/src/commonTest/kotlin/com/zhousl/aether/data/SharedAppDataArchiveTest.kt')
+          s=p.read_text()
+          start=s.index('fun malformedSettingsFieldFallsBackIndividuallyLikeAndroid()')
+          end=s.index('\n    @Test', start+10)
+          block=s[start:end]
+          old='assertEquals(AppLanguage.Russian, settings.language)'
+          assert block.count(old)==1, block.count(old)
+          block=block.replace(old, 'assertEquals(AppLanguage.English, settings.language)', 1)
+          s=s[:start]+block+s[end:]
+          p.write_text(s)
+          PY
+          git diff --check
+          git diff --numstat -- "$file"
+          test "$(git diff --numstat -- "$file" | awk '{print $1+$2}')" -le 2
+          git add "$file"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test(i18n): migrate removed Chinese locale to English fallback'
+          git push origin HEAD:refs/heads/i18n/en-ru-only

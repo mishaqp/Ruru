@@ -1,0 +1,38 @@
+name: ARM64 Alpine release verification
+on:
+  push:
+    branches: ['ci/release-ruru-0.1.1']
+    paths: ['.github/workflows/arm64-runtime-check.yml']
+permissions:
+  contents: read
+jobs:
+  alpine-arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 42c08ec45d5095dfb1eb59153b3d223acc35d769
+          persist-credentials: false
+      - name: Run the same integration suite on aarch64 musl (no model API)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD:/source" -w /source alpine:3.23 sh -ec '
+            apk add --no-cache nodejs npm git bash curl python3
+            uname -m
+            cat /etc/os-release
+            node --version
+            test "$(uname -m)" = aarch64
+            python3 scripts/check-ruru-locales.py
+            cd pi-bridge
+            npm ci --no-audit --no-fund
+            npm run check
+            npm test
+          ' 2>&1 | tee arm64-alpine-tests.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: arm64-alpine-verification
+          path: arm64-alpine-tests.log
+          retention-days: 14

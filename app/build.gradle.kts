@@ -38,11 +38,29 @@ val nightlyKeystoreFile = localOrEnv("nightly.storeFile", "NIGHTLY_KEYSTORE_FILE
 val nightlyKeystorePassword = localOrEnv("nightly.storePassword", "NIGHTLY_KEYSTORE_PASSWORD")
 val nightlyKeyAlias = localOrEnv("nightly.keyAlias", "NIGHTLY_KEY_ALIAS")
 val nightlyKeyPassword = localOrEnv("nightly.keyPassword", "NIGHTLY_KEY_PASSWORD")
+// Permanent Ruru release signing material. Never committed: the workflow restores
+// the keystore from Actions secrets into $RUNNER_TEMP and points these at it.
+val ruruKeystoreFile = localOrEnv("ruru.storeFile", "RURU_KEYSTORE_FILE")
+val ruruKeystorePassword = localOrEnv("ruru.storePassword", "RURU_KEYSTORE_PASSWORD")
+val ruruKeyAlias = localOrEnv("ruru.keyAlias", "RURU_KEY_ALIAS")
+val ruruKeyPassword = localOrEnv("ruru.keyPassword", "RURU_KEY_PASSWORD")
 val appVersionName = providers.gradleProperty("aether.versionName")
     .orNull
     ?.trim()
     ?.takeIf { it.isNotEmpty() }
     ?: "2.1.6"
+// Ruru release versioning. Both are passed by the release workflow
+// (-Pruru.versionName / -Pruru.versionCode); the updater parses the numeric core
+// of the tag, so the numeric part must grow on every release.
+// versionCode scheme: major * 1_000_000 + minor * 10_000 + patch * 100 + ruru revision.
+val ruruVersionName = providers.gradleProperty("ruru.versionName")
+    .orNull
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+val ruruVersionCode = providers.gradleProperty("ruru.versionCode")
+    .orNull
+    ?.trim()
+    ?.toIntOrNull()
 val piBridgeProjectDir = rootProject.layout.projectDirectory.dir("pi-bridge")
 val piBridgeGeneratedAssetsDir = layout.buildDirectory.dir("generated/assets/piBridge")
 val preinstalledExtensionsDir = rootProject.layout.projectDirectory.dir("extensions")
@@ -109,13 +127,16 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.baimoqilin.aether"
+        // Stable applicationId: every future Ruru build must install over the
+        // previous one without touching app data. The Kotlin namespace above stays
+        // com.zhousl.aether on purpose - renaming it would touch the whole tree.
+        applicationId = "com.mishaqp.ruru"
         minSdk = 26
         // Alpine/Termux-style local runtimes install executable ELF files into app-private
         // storage. Android blocks execve() from that location for targetSdk >= 29.
         targetSdk = 28
-        versionCode = 11
-        versionName = appVersionName
+        versionCode = ruruVersionCode ?: 11
+        versionName = ruruVersionName ?: appVersionName
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -135,6 +156,20 @@ android {
     }
 
     signingConfigs {
+        create("ruru") {
+            if (
+                ruruKeystoreFile.isNotBlank() &&
+                ruruKeystorePassword.isNotBlank() &&
+                ruruKeyAlias.isNotBlank() &&
+                ruruKeyPassword.isNotBlank()
+            ) {
+                storeFile = file(ruruKeystoreFile)
+                storePassword = ruruKeystorePassword
+                keyAlias = ruruKeyAlias
+                keyPassword = ruruKeyPassword
+            }
+        }
+
         create("nightly") {
             if (
                 nightlyKeystoreFile.isNotBlank() &&
@@ -185,8 +220,24 @@ android {
         }
 
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // R8 stays OFF for Ruru releases until the release variant has been
+            // verified end to end. Extensions, Native Mods (runtime DEX) and the
+            // Termux/Alpine JNI layers rely on reflection-heavy lookups that a
+            // shrinker can silently strip, and a build that installs but crashes
+            // at runtime is worse than a larger APK. Flip these on only after a
+            // release has been smoke-tested with shrinking enabled.
+            isMinifyEnabled = false
+            isShrinkResources = false
+            signingConfig = if (
+                ruruKeystoreFile.isNotBlank() &&
+                ruruKeystorePassword.isNotBlank() &&
+                ruruKeyAlias.isNotBlank() &&
+                ruruKeyPassword.isNotBlank()
+            ) {
+                signingConfigs.getByName("ruru")
+            } else {
+                null
+            }
             manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
             manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
             manifestPlaceholders["appLabel"] = "@string/app_name"

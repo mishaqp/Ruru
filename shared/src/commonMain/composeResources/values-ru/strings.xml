@@ -2,7 +2,7 @@
 <resources>
     <string name="common_show_password">Показать пароль</string>
     <string name="common_hide_password">Скрыть пароль</string>
-    <string name="app_name">Aether</string>
+    <string name="app_name">Ruru</string>
 
     <!-- Common -->
     <string name="common_menu">Меню</string>

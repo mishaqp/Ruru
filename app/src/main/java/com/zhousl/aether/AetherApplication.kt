@@ -82,6 +82,7 @@ class AetherApplication : Application() {
                     listOf(
                         "com.zhousl.aether",
                         "com.baimoqilin.aether",
+                        "com.mishaqp.ruru",
                     ),
                 )
             }

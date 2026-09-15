@@ -218,7 +218,7 @@ private const val MinLlmInactivityReconnectTimeoutSeconds = 30
 private const val MaxLlmInactivityReconnectTimeoutSeconds = 3600
 const val OnboardingStarterPrompt = "Hi"
 const val AetherWebsiteUrl = "https://aether.baimoqilin.com"
-const val AetherGitHubUrl = "https://github.com/Zhou-Shilin/Aether"
+const val AetherGitHubUrl = "https://github.com/mishaqp/Ruru"
 const val AetherPrivacyPolicyUrl = "https://github.com/Zhou-Shilin/Aether/wiki/Privacy-Policy"
 
 private val AppSettingsJson = Json {

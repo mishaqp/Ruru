@@ -1053,4 +1053,39 @@
     <string name="file_manager_view_grid">Сетка</string>
     <string name="file_manager_view_list">Список</string>
     <string name="common_confirm">Подтвердить</string>
+
+    <!-- Alpine file manager -->
+    <string name="file_manager_alpine_title">Файлы Alpine</string>
+    <string name="file_manager_back">Назад</string>
+    <string name="file_manager_parent_folder">Родительская папка</string>
+    <string name="file_manager_view_options">Параметры отображения</string>
+    <string name="file_manager_sort_by">Сортировка: %1$s</string>
+    <string name="file_manager_sort_name">имя</string>
+    <string name="file_manager_sort_date">дата</string>
+    <string name="file_manager_sort_size">размер</string>
+    <string name="file_manager_search_this_folder">Поиск в этой папке</string>
+    <string name="file_manager_create">Создать</string>
+    <string name="file_manager_import_files">Импорт файлов</string>
+    <string name="file_manager_import_folder">Импорт папки</string>
+    <string name="file_manager_download">Скачать</string>
+    <string name="file_manager_more">Ещё</string>
+    <string name="file_manager_no_matching_files">Нет подходящих файлов</string>
+    <string name="file_manager_delete_title">Удалить «%1$s»?</string>
+    <string name="file_manager_delete_folder_warning">Папка и всё её содержимое будут удалены безвозвратно.</string>
+    <string name="file_manager_delete_item_warning">Этот элемент будет удалён безвозвратно.</string>
+    <string name="file_manager_item_exists">Элемент с именем %1$s уже существует.</string>
+    <string name="file_manager_invalid_name">У выбранного элемента недопустимое имя.</string>
+    <string name="file_manager_unable_read">Не удалось прочитать %1$s.</string>
+    <string name="file_manager_unable_decode_image">Не удалось декодировать изображение</string>
+    <string name="file_manager_operation_failed">Не удалось выполнить операцию с файлом</string>
+    <string name="file_manager_ok">ОК</string>
+    <string name="file_manager_toggle_wrapping">Перенос строк</string>
+    <string name="file_manager_save">Сохранить</string>
+    <string name="file_manager_unable_load_directory">Не удалось загрузить каталог.</string>
+    <string name="file_manager_unable_open_item">Не удалось открыть выбранный элемент.</string>
+    <string name="file_manager_unable_import_item">Не удалось импортировать выбранный элемент.</string>
+    <string name="file_manager_unable_open_download_location">Не удалось открыть выбранное место для скачивания.</string>
+    <string name="file_manager_unable_download_file">Не удалось скачать файл.</string>
+    <string name="file_manager_unable_open_file">Не удалось открыть файл.</string>
+    <string name="file_manager_unable_save_file">Не удалось сохранить файл.</string>
 </resources>

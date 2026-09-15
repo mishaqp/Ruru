@@ -1053,4 +1053,39 @@
     <string name="file_manager_view_grid">Grid view</string>
     <string name="file_manager_view_list">List view</string>
     <string name="common_confirm">Confirm</string>
+
+    <!-- Alpine file manager -->
+    <string name="file_manager_alpine_title">Alpine Files</string>
+    <string name="file_manager_back">Back</string>
+    <string name="file_manager_parent_folder">Parent folder</string>
+    <string name="file_manager_view_options">View options</string>
+    <string name="file_manager_sort_by">Sort by %1$s</string>
+    <string name="file_manager_sort_name">name</string>
+    <string name="file_manager_sort_date">date</string>
+    <string name="file_manager_sort_size">size</string>
+    <string name="file_manager_search_this_folder">Search this folder</string>
+    <string name="file_manager_create">Create</string>
+    <string name="file_manager_import_files">Import files</string>
+    <string name="file_manager_import_folder">Import folder</string>
+    <string name="file_manager_download">Download</string>
+    <string name="file_manager_more">More</string>
+    <string name="file_manager_no_matching_files">No matching files</string>
+    <string name="file_manager_delete_title">Delete %1$s?</string>
+    <string name="file_manager_delete_folder_warning">The folder and all of its contents will be permanently deleted.</string>
+    <string name="file_manager_delete_item_warning">This item will be permanently deleted.</string>
+    <string name="file_manager_item_exists">An item named %1$s already exists.</string>
+    <string name="file_manager_invalid_name">The selected item has an invalid name.</string>
+    <string name="file_manager_unable_read">Unable to read %1$s.</string>
+    <string name="file_manager_unable_decode_image">Unable to decode image</string>
+    <string name="file_manager_operation_failed">File operation failed</string>
+    <string name="file_manager_ok">OK</string>
+    <string name="file_manager_toggle_wrapping">Toggle line wrapping</string>
+    <string name="file_manager_save">Save</string>
+    <string name="file_manager_unable_load_directory">Unable to load directory.</string>
+    <string name="file_manager_unable_open_item">Unable to open the selected item.</string>
+    <string name="file_manager_unable_import_item">Unable to import the selected item.</string>
+    <string name="file_manager_unable_open_download_location">Unable to open the selected download location.</string>
+    <string name="file_manager_unable_download_file">Unable to download the file.</string>
+    <string name="file_manager_unable_open_file">Unable to open file.</string>
+    <string name="file_manager_unable_save_file">Unable to save file.</string>
 </resources>

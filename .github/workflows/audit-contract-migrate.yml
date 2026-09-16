@@ -11,30 +11,24 @@ concurrency:
 jobs:
   apply:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     outputs:
       commit: ${{ steps.commit.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.ref }}
-      - name: Apply the reviewed type-only migration
-        run: python3 scripts/audit-contract-migrate.py
-      - name: Lock check-time dependencies
-        shell: bash
-        run: |
-          for dir in packages/extension-api extensions/pi-mcp-adapter extensions/pi-subagents extensions/pi-web-access; do
-            (cd "$dir" && npm install --package-lock-only --ignore-scripts --include=optional --legacy-peer-deps --no-audit --no-fund)
-          done
-          git diff --check
-      - name: Commit only scoped repair files
+      - name: Apply reviewed header corrections
+        run: python3 scripts/audit-contract-headers.py
+      - name: Commit only verified adapter corrections
         id: commit
         shell: bash
         run: |
+          git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add packages/extension-api/package-lock.json extensions/pi-mcp-adapter/aether.ts extensions/pi-mcp-adapter/tsconfig.json extensions/pi-mcp-adapter/package-lock.json extensions/pi-subagents/src/aether.ts extensions/pi-subagents/tsconfig.json extensions/pi-subagents/package-lock.json extensions/pi-web-access/aether.ts extensions/pi-web-access/tsconfig.json extensions/pi-web-access/package.json extensions/pi-web-access/package-lock.json
-          git commit -m 'fix: share bundled UI contracts and lock extension typecheck dependencies'
+          git add extensions/pi-web-access/openai-search.ts extensions/pi-web-access/xai-search.ts extensions/pi-web-access/index.ts extensions/pi-web-access/summary-review.ts
+          git commit -m 'fix: align Web Access nullable headers with the pinned Pi client'
           git push origin HEAD:fix/audit-extension-contracts
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   check:
@@ -52,25 +46,18 @@ jobs:
         with:
           ref: ${{ needs.apply.outputs.commit }}
           persist-credentials: false
-      - name: Build and check canonical SDK declarations
-        run: |
-          npm ci --prefix packages/extension-api --ignore-scripts --no-audit --no-fund
-          npm run check --prefix packages/extension-api
-      - name: Typecheck all package sources
+      - name: Full typecheck and invalid-type coverage probe
         shell: bash
         env:
           PACKAGE: ${{ matrix.package }}
-        run: |
-          cd "extensions/$PACKAGE"
-          npm ci --ignore-scripts --include=optional --legacy-peer-deps --no-audit --no-fund
-          npm run typecheck 2>&1 | tee ../../typecheck-$PACKAGE.log
+        run: node scripts/check-bundled-extensions.mjs "$PACKAGE" 2>&1 | tee typecheck-$PACKAGE.log
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: repaired-contract-${{ matrix.package }}
           path: typecheck-*.log
           retention-days: 7
-  guard:
+  regression:
     needs: apply
     permissions:
       contents: read
@@ -81,7 +68,17 @@ jobs:
         with:
           ref: ${{ needs.apply.outputs.commit }}
           persist-credentials: false
+      - run: python3 scripts/check-ruru-locales.py
       - run: npm ci --no-audit --no-fund
         working-directory: pi-bridge
-      - run: node --test tests/extension-contracts.test.mjs
+      - run: npm run check
         working-directory: pi-bridge
+      - run: npm test 2>&1 | tee ../regression.log
+        shell: bash
+        working-directory: pi-bridge
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: repaired-contract-regressions
+          path: regression.log
+          retention-days: 7

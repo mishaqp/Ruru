@@ -6,6 +6,16 @@ import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { test } from "node:test";
 
+// Assert user-visible presentation separately from opaque runtime metadata.
+// In particular Web Access's internal bindings must NOT be translated.
+const opaqueSnapshotKeys = new Set([
+  "bindings", "args", "editArgs", "deleteArgs", "trailingArgs", "trailing_args",
+  "payload", "data", "storage", "value", "default", "schema", "parameters",
+]);
+const presentationJson = snapshot => JSON.stringify(snapshot, (key, value) =>
+  opaqueSnapshotKeys.has(key) ? undefined : value
+);
+
 // Uses the real bundled packages, but a local faux model: no model API credentials.
 // An isolated bridge copy prevents accidental resolution from the CI checkout's node_modules.
 test("bundled integrations load in a clean native runtime, expose UI, and respect disabling", { timeout: 600_000 }, async () => {
@@ -74,7 +84,7 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
     assert.equal(ui.reloaded, true, JSON.stringify(ui));
     assert.deepEqual(ui.snapshot.errors, [], JSON.stringify(ui.snapshot.errors));
     assert.ok(ui.snapshot.settings.length >= 3);
-    const ruSnapshot = JSON.stringify(ui.snapshot);
+    const ruSnapshot = presentationJson(ui.snapshot);
     assert.match(ruSnapshot, /Веб-доступ/);
     assert.match(ruSnapshot, /Все доступные провайдеры/);
     assert.match(ruSnapshot, /MCP-серверы/);
@@ -97,7 +107,13 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
 
     // Switching to English must restore the untouched source presentation.
     const enUi = await request("reload_aether_extensions", { context: { platform: "android", language: "en" } });
-    const enSnapshot = JSON.stringify(enUi.snapshot);
+    const enSnapshot = presentationJson(enUi.snapshot);
+    const providerBindings = snapshot => snapshot.settings
+      .find(page => page.local_id === "web-access-settings")?.categories
+      .find(category => category.id === "provider")?.sections
+      .find(section => section.id === "provider")?.bindings;
+    assert.ok(providerBindings(ui.snapshot), "real Web Access bindings must be present");
+    assert.deepEqual(providerBindings(ui.snapshot), providerBindings(enUi.snapshot), "RU must not mutate runtime bindings");
     assert.match(enSnapshot, /Web Access/);
     assert.match(enSnapshot, /All eligible providers/);
     assert.match(enSnapshot, /MCP Servers/);

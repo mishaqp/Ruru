@@ -63,12 +63,8 @@ ru_text = ru_text.replace("Agent Mode", "Режим агента")
 ru_strings.write_text(ru_text, encoding="utf-8")
 
 # 4) Audit remaining likely user-facing English without modifying technical data.
-lines: list[str] = []
-lines.append("=== Ruru i18n branch sweep audit ===")
-lines.append("")
+lines: list[str] = ["=== Ruru i18n branch sweep audit ===", ""]
 
-# Russian resources with Latin text but no Cyrillic. Many are intentionally
-# technical; the report lets us review the finite remainder explicitly.
 lines.append("[RU resources: Latin-only candidates]")
 for xml_path in sorted((ROOT / "shared/src/commonMain/composeResources/values-ru").glob("*.xml")):
     root = ET.parse(xml_path).getroot()
@@ -81,14 +77,13 @@ for xml_path in sorted((ROOT / "shared/src/commonMain/composeResources/values-ru
         lines.append(f"{xml_path.relative_to(ROOT)} :: {node.get('name')} = {value}")
 lines.append("")
 
-# Kotlin/Compose candidates: only well-known UI sinks, not arbitrary strings.
 lines.append("[Kotlin/Compose hardcoded UI candidates]")
 ui_patterns = [
-    re.compile(r'\\bText\\s*\\(\\s*"([^"\\n]*[A-Za-z][^"\\n]*)"'),
-    re.compile(r'contentDescription\\s*=\\s*"([^"\\n]*[A-Za-z][^"\\n]*)"'),
-    re.compile(r'placeholder\\s*=\\s*"([^"\\n]*[A-Za-z][^"\\n]*)"'),
-    re.compile(r'\\b(?:title|label|subtitle)\\s*=\\s*"([^"\\n]*[A-Za-z][^"\\n]*)"'),
-    re.compile(r'\\b(?:showSnackbar|Toast\\.makeText)\\s*\\([^\\n]*"([^"\\n]*[A-Za-z][^"\\n]*)"'),
+    re.compile(r'\bText\s*\(\s*"([^"\n]*[A-Za-z][^"\n]*)"'),
+    re.compile(r'contentDescription\s*=\s*"([^"\n]*[A-Za-z][^"\n]*)"'),
+    re.compile(r'placeholder\s*=\s*"([^"\n]*[A-Za-z][^"\n]*)"'),
+    re.compile(r'\b(?:title|label|subtitle)\s*=\s*"([^"\n]*[A-Za-z][^"\n]*)"'),
+    re.compile(r'\b(?:showSnackbar|Toast\.makeText)\s*\([^\n]*"([^"\n]*[A-Za-z][^"\n]*)"'),
 ]
 for base in [ROOT / "app/src", ROOT / "shared/src"]:
     if not base.exists():
@@ -106,23 +101,23 @@ for base in [ROOT / "app/src", ROOT / "shared/src"]:
                     break
 lines.append("")
 
-# Bundled extension presentation literals. Restrict to Aether UI/definition
-# syntax; tool schema/source implementation strings are intentionally excluded.
 lines.append("[Bundled extension presentation candidates]")
 extension_files = [
     ROOT / "extensions/pi-mcp-adapter/aether.ts",
     ROOT / "extensions/pi-subagents/src/aether.ts",
     ROOT / "extensions/pi-web-access/aether.ts",
 ]
-presentation = re.compile(
-    r'(?:\\b(?:title|subtitle|label|description|placeholder|buttonLabel)\\s*:\\s*|'
-    r'\\.ui\\.(?:text|button)\\(\\s*)"([^"\\n]*[A-Za-z][^"\\n]*)"'
-)
+extension_patterns = [
+    re.compile(r'\b(?:title|subtitle|label|description|placeholder|buttonLabel)\s*:\s*"([^"\n]*[A-Za-z][^"\n]*)"'),
+    re.compile(r'\.ui\.(?:text|button)\(\s*"([^"\n]*[A-Za-z][^"\n]*)"'),
+]
 for source in extension_files:
     for number, source_line in enumerate(source.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
-        match = presentation.search(source_line)
-        if match:
-            lines.append(f"{source.relative_to(ROOT)}:{number}: {match.group(1)}")
+        for pattern in extension_patterns:
+            match = pattern.search(source_line)
+            if match:
+                lines.append(f"{source.relative_to(ROOT)}:{number}: {match.group(1)}")
+                break
 
 REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
 print(REPORT.read_text(encoding="utf-8"))

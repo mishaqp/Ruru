@@ -1,22 +1,8 @@
 name: Build Nightly APK
 
+# Nightly APKs are opt-in only. Normal fixes, PRs and merges must not build them.
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - 'app/**'
-      - 'shared/**'
-      - 'pi-bridge/**'
-      - 'packages/extension-api/**'
-      - 'third_party/termux/terminal-emulator/**'
-      - 'third_party/termux/terminal-view/**'
-      - 'build.gradle.kts'
-      - 'settings.gradle.kts'
-      - 'gradle.properties'
-      - 'gradle/**'
-      - 'gradlew'
-      - '.github/workflows/build-nightly-apk.yml'
 
 permissions:
   contents: read
@@ -42,8 +28,6 @@ jobs:
           cache-provider: enhanced
           cache-read-only: false
 
-      # Fix: the `tools` package no longer exists in modern cmdline-tools,
-      # so asking setup-android for it makes the whole job fail before Gradle runs.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
@@ -60,8 +44,6 @@ jobs:
           echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"
           echo "version_name=Nightly $short_sha" >> "$GITHUB_OUTPUT"
 
-      # No NIGHTLY_* env on purpose: app/build.gradle.kts then falls back to the
-      # debug signing config, so the build needs zero repository secrets.
       - name: Build Nightly APK
         env:
           VERSION_NAME: ${{ steps.nightly.outputs.version_name }}

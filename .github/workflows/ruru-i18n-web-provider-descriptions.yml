@@ -1,0 +1,52 @@
+name: Ruru Web provider description localization
+
+on:
+  push:
+    branches:
+      - 'fix/complete-russian-ui-0.1.2'
+
+permissions:
+  contents: write
+
+jobs:
+  localize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Add presentation-only Web provider translations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('pi-bridge/src/aether-ui-i18n.ts')
+          text = path.read_text(encoding='utf-8')
+          marker = '  // Web Access additions.\n  "Pick a specific provider above to configure its API key, base URL, and provider-specific options.": "Выберите конкретного провайдера выше, чтобы настроить его API-ключ, базовый URL и специальные параметры.",\n'
+          replacement = '''  // Web Access additions.\n  "Pick a specific provider above to configure its API key, base URL, and provider-specific options.": "Выберите конкретного провайдера выше, чтобы настроить его API-ключ, базовый URL и специальные параметры.",\n  "Optional Responses-compatible endpoint override. Empty uses the default endpoint.": "Необязательная конечная точка, совместимая с Responses. Пустое значение использует адрес по умолчанию.",\n  "Optional endpoint override. Empty uses the default endpoint.": "Необязательная конечная точка. Пустое значение использует адрес по умолчанию.",\n  "Optional gateway override; search and extract requests are routed there. Empty uses the default endpoint.": "Необязательный шлюз; через него направляются запросы поиска и извлечения. Пустое значение использует адрес по умолчанию.",\n  "Optional gateway override; search and fetch requests are routed there. Empty uses the default endpoint.": "Необязательный шлюз; через него направляются запросы поиска и загрузки. Пустое значение использует адрес по умолчанию.",\n  "Optional gateway override; search and fetch requests are routed there. Empty uses the default endpoints.": "Необязательный шлюз; через него направляются запросы поиска и загрузки. Пустое значение использует адреса по умолчанию.",\n  "Optional gateway override; search and crawl requests are routed there. Empty uses the default endpoint.": "Необязательный шлюз; через него направляются запросы поиска и обхода страниц. Пустое значение использует адрес по умолчанию.",\n  "Optional gateway override; search and contents requests are routed there. Empty uses the default endpoint.": "Необязательный шлюз; через него направляются запросы поиска и получения содержимого. Пустое значение использует адрес по умолчанию.",\n  "Optional gateway override for the direct answer and search APIs; the zero-config Exa MCP tool is not affected. Empty uses the default endpoint.": "Необязательный шлюз для API прямых ответов и поиска; MCP-инструмент Exa без настройки не затрагивается. Пустое значение использует адрес по умолчанию.",\n  "Optional bare gateway URL without an API version suffix. Empty uses the default endpoint.": "Необязательный базовый URL шлюза без суффикса версии API. Пустое значение использует адрес по умолчанию.",\n  "Self-hosted SearXNG search instance. Search is routed here first when configured.": "Собственный экземпляр поиска SearXNG. После настройки поиск сначала направляется сюда.",\n  "Optional firewall-compatible Firecrawl server for blocked-content extraction.": "Необязательный сервер Firecrawl для извлечения заблокированного содержимого с учётом сетевых ограничений.",\n'''
+          if marker not in text:
+              raise SystemExit('Web Access insertion marker missing')
+          text = text.replace(marker, replacement, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+          cd pi-bridge
+          npm ci --no-audit --no-fund
+          npm run check
+          cd ..
+          git diff --check
+
+      - name: Commit and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/ruru-i18n-web-provider-descriptions.yml
+          git add pi-bridge/src/aether-ui-i18n.ts
+          git diff --cached --check
+          git commit -m 'feat(i18n): localize Web Access provider descriptions'
+          git push origin HEAD:fix/complete-russian-ui-0.1.2

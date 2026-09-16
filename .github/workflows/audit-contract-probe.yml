@@ -1,0 +1,51 @@
+name: Audit contracts development check
+on:
+  push:
+    branches: ['fix/audit-contracts-no-nightly']
+    paths: ['.github/workflows/audit-contract-probe.yml', 'scripts/audit-contracts-dev.py']
+permissions:
+  contents: read
+concurrency:
+  group: audit-contract-probe
+  cancel-in-progress: true
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install bridge compiler and locked dependencies
+        run: npm ci --prefix pi-bridge --no-audit --no-fund
+      - name: Inspect exact source dependencies and removal call sites
+        shell: bash
+        run: |
+          git grep -n -E 'removeExtensionPackage|piExtensionManager.remove|fun remove\(' -- app/src shared/src | head -100
+          git ls-files 'extensions/*/package-lock.json' 'extensions/*/tsconfig*' 'packages/extension-api/*'
+          git grep -n -E 'activateAether|defineAetherExtension|export default' -- extensions/pi-mcp-adapter/aether.ts extensions/pi-web-access/aether.ts extensions/pi-subagents/src/aether.ts
+      - name: Typecheck actual extension sources (diagnostic only)
+        shell: bash
+        run: |
+          set -o pipefail
+          ln -s "$GITHUB_WORKSPACE/pi-bridge/node_modules" node_modules
+          mkdir -p audit-type-reports
+          for name in pi-mcp-adapter pi-subagents pi-web-access; do
+            echo "::group::$name"
+            npm install --prefix "extensions/$name" --omit=dev --omit=optional --legacy-peer-deps --ignore-scripts --no-audit --no-fund > "audit-type-reports/$name-install.txt" 2>&1 || { cat "audit-type-reports/$name-install.txt"; exit 1; }
+            set +e
+            node pi-bridge/node_modules/typescript/bin/tsc -p "extensions/$name/tsconfig.json" --noEmit --pretty false 2>&1 | tee "audit-type-reports/$name-types.txt"
+            result=${PIPESTATUS[0]}
+            set -e
+            echo "$name compiler exit: $result"
+            echo "::endgroup::"
+          done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: extension-type-probe
+          path: audit-type-reports/
+          retention-days: 7

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { guardExtensionApi, withExtensionDeadline } from "./extension-operation.js";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -717,7 +718,7 @@ function createApi(
   const invalidate = () => {
     if (runtime === runtimeState) bumpVersion();
   };
-  return {
+  const api: AetherExtensionAPI = {
     apiVersion: AETHER_API_VERSION,
     extension: {
       id: extension.id,
@@ -1039,6 +1040,7 @@ function createApi(
       transport.notify(localizeAetherUiText(message, latestHostContext), level);
     },
   };
+  return guardExtensionApi(api);
 }
 
 async function loadFactory(
@@ -1073,7 +1075,7 @@ async function cleanupRuntime(
     if (preservedExtensions.has(extension)) continue;
     if (!extension.cleanup) continue;
     try {
-      await extension.cleanup();
+      await withExtensionDeadline("cleanup", extension.id, () => extension.cleanup?.());
     } catch (error) {
       recordRuntimeError(errorTarget, {
         path: extension.path,
@@ -1192,9 +1194,9 @@ async function loadAetherAppExtensionsUnlocked(
       if (descriptor.compatibilityError) {
         throw new Error(descriptor.compatibilityError);
       }
-      const factory = await loadFactory(descriptor);
+      const factory = await withExtensionDeadline("load", extension.id, () => loadFactory(descriptor));
       if (!factory) continue;
-      const cleanup = await factory(createApi(candidate, extension));
+      const cleanup = await withExtensionDeadline("load", extension.id, () => factory(createApi(candidate, extension)));
       if (typeof cleanup === "function") extension.cleanup = cleanup;
       candidate.extensions.push(extension);
       successfulLoads += 1;
@@ -1257,7 +1259,7 @@ async function renderRegisteredView(
 ): Promise<AetherView> {
   try {
     const value = typeof render === "function"
-      ? await render(createRenderContext(extension))
+      ? await withExtensionDeadline("render", extension.id, () => render(createRenderContext(extension)))
       : render;
     return cloneJson(value);
   } catch (error) {
@@ -1288,10 +1290,10 @@ async function renderRegisteredMessage(
   try {
     const render = registration.render;
     const value = typeof render === "function"
-      ? await render({
+      ? await withExtensionDeadline("render", registration.extension.id, () => render({
         ...createRenderContext(registration.extension),
         message: { ...message, ...asObject(message.payload) },
-      })
+      }))
       : render;
     return cloneJson(value);
   } catch (error) {
@@ -1481,13 +1483,13 @@ async function invokeAetherAppExtensionActionUnlocked(
   const action = runtime.actions.get(id);
   if (!action) throw new Error(`Unknown Aether extension action: ${actionId}`);
   try {
-    const result = await action.handler(
+    const result = await withExtensionDeadline("action", action.extension.id, () => action.handler(
       cloneJson(payload),
       {
         ...createRenderContext(action.extension),
         action: action.localId,
       },
-    );
+    ));
     bumpVersion();
     return {
       invoked: true,
@@ -1535,13 +1537,13 @@ async function dispatchAetherAppExtensionEventUnlocked(
   const results: unknown[] = [];
   for (const registration of handlers) {
     try {
-      const rawResult = await registration.handler(
+      const rawResult = await withExtensionDeadline("event", registration.extension.id, () => registration.handler(
         cloneJson(chainedPayload),
         {
           ...createRenderContext(registration.extension),
           event: eventName,
         },
-      );
+      ));
       results.push(cloneJson(rawResult));
       const result = asObject(rawResult);
       if (result.cancel === true || result.cancelled === true) {

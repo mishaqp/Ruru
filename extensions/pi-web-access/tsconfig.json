@@ -5,7 +5,18 @@
     "moduleResolution": "NodeNext",
     "noEmit": true,
     "skipLibCheck": true,
-    "target": "ES2022"
+    "target": "ES2022",
+    "paths": {
+      "@baimoqilin/aether-extension-api": [
+        "../../packages/extension-api/dist/index.d.ts"
+      ]
+    },
+    "types": [
+      "node"
+    ],
+    "strict": true
   },
-  "include": ["*.ts"]
+  "include": [
+    "*.ts"
+  ]
 }

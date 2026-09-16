@@ -87,8 +87,12 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
     assert.doesNotMatch(ruSnapshot, /"Web Access"/);
     assert.doesNotMatch(ruSnapshot, /"MCP Servers"/);
     assert.doesNotMatch(ruSnapshot, /"Add MCP server"/);
+    assert.doesNotMatch(ruSnapshot, /"MCP Runtime"/);
     assert.doesNotMatch(ruSnapshot, /"Subagent Types"/);
+    assert.doesNotMatch(ruSnapshot, /"Create agent definition"/);
     assert.doesNotMatch(ruSnapshot, /"Context Extraction"/);
+    assert.doesNotMatch(ruSnapshot, /"Privacy and network"/);
+    assert.doesNotMatch(ruSnapshot, /"Raw results"/);
 
     // Switching to English must restore the untouched source presentation.
     const enUi = await request("reload_aether_extensions", { context: { platform: "android", language: "en" } });

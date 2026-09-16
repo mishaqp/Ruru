@@ -1,0 +1,33 @@
+name: Audit repair development
+on:
+  push:
+    branches: ['fix/audit-stability-no-nightly']
+    paths: ['.github/workflows/audit-development.yml', 'scripts/apply-audit-repairs.py', 'pi-bridge/tests/audit-regressions.test.mjs']
+permissions:
+  contents: read
+concurrency:
+  group: audit-repair-development
+  cancel-in-progress: false
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked test dependencies
+        working-directory: pi-bridge
+        run: npm ci --no-audit --no-fund
+      - name: Run regression reproducers against unchanged production code
+        working-directory: pi-bridge
+        shell: bash
+        run: node --test tests/audit-regressions.test.mjs 2>&1 | tee ../audit-reproducers.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: audit-reproducers
+          path: audit-reproducers.log

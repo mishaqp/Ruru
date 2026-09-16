@@ -1,34 +1,38 @@
 # Extension contract repair plan
 
-## Scope and constraints
+## Scope
 
 Base: `3acd2343e90fd2616021b0ac89154a9e4cfaa9a8` (PR #10 already merged).
-Preserve `com.mishaqp.ruru`, release signing, RU/EN presentation, all tools/providers and chat data. No Nightly build or automatic Nightly trigger. Work through GitHub and GitHub Actions; no local clone.
+Preserve `com.mishaqp.ruru`, permanent release signing, RU/EN, arm64-v8a, tools/providers and chat data. No Nightly APKs or automatic Nightly triggers. All source changes and execution are through GitHub and Actions; no local clone.
 
-## R09/R10: one checked API contract
+## R09/R10: checked shared API — implemented
 
-- [x] Run the compiler against every source included by the three bundled packages' existing tsconfigs. Diagnostic run `35073904011` found Web Access's incorrect one-argument action contract and missing compiler-only cross-spawn declarations; Subagents passed.
-- [ ] Replace duplicated Aether API/view/settings types with type-only imports from `@baimoqilin/aether-extension-api`. Preserve existing exported type names in MCP.
-- [ ] Build and check the existing SDK declarations. Use the bridge's pinned TypeScript/Pi versions for all bundled checks; do not disable existing strictness flags.
-- [ ] Add a dedicated CI check which installs runtime dependencies without executing install hooks, typechecks each package, and fails on any compiler error. Check that all tracked TypeScript implementation files are covered.
-- [ ] Run the real standalone bundled-runtime test to prove type-only SDK imports introduce no runtime dependency.
+- Replaced all three bundled Aether API/view/settings copies with erased type-only imports from the existing `@baimoqilin/aether-extension-api`. MCP's public type exports remain available.
+- Built and tested SDK declarations. Bundled checks use bridge-pinned TypeScript 5.9.3 and Pi 0.85.1, without weakening existing tsconfig flags.
+- Added a required-to-pass PR job for all tracked implementation sources: MCP 60, Subagents 40, Web Access 52. Coverage enumeration fails when a tracked TS implementation is omitted.
+- Added compiler-only cross-spawn/turndown declarations; no runtime dependency version was changed.
+- Verified that transpilation erases SDK imports and the standalone bundled runtime loads without compiler-only dependency links.
 
-## R11: observable, consistent removal
+Evidence: diagnostic run `35073904011` found Web Access callbacks using a second argument that its copied interface did not permit. Run `35075557689`, job `104727140329`, passed SDK checks, all 152 bundled sources, bridge TypeScript, locale parity and 63/63 Node tests including the real bundled runtime.
 
-Preserve the low-level disk-only removal operation used by archive restore. High-level Android/shared agent management must request exactly one reload, return its actual scheduled/completed state, and not change the enabled preference before successful deletion.
+## R11: observable removal — implemented
 
-- [ ] Add management tests for remove -> reload, deferred reload, missing package, reload failure and cancellation.
-- [ ] Reproduce the missing shared reload before changing production code.
-- [ ] Retain the Android UI's Result<Unit> wrapper and expose detailed removal results to its agent-facing caller.
-- [ ] Do not claim that a busy session is immediately unloaded. Preserve full reload diagnostics.
+The low-level disk-only bridge operation remains unchanged because archive restoration batches removals. A single shared helper now handles high-level Android/shared removal.
 
-## Verification and integration
+- Exactly one reload after successful deletion; no reload for a missing package.
+- Preserve `removed=true` when subsequent application fails; include raw reload diagnostics.
+- Report `reload_status=scheduled|completed|failed|not_removed` and truthful `effective_on_next_turn` only when application is confirmed/scheduled.
+- Clear the enabled/disabled preference only after successful deletion.
+- Preserve cancellation instead of reporting it as completed work.
+- Retain Android UI's `Result<Unit>` wrapper; the agent receives the detailed result.
+- Android declares the same existing JSON library used by shared, since the helper exposes JSON at the module boundary.
 
-- [ ] Locale validator; bridge TypeScript; SDK and all bundled types; Node regressions and real bundled load.
-- [ ] Android/shared unit tests and arm64-v8a assembleDebug in Actions.
-- [ ] Inspect the final PR diff; remove temporary self-writing development workflows/scripts before merging.
-- [ ] Merge only after final-head required checks succeed. Keep stable signing and Nightly manual-only.
+Evidence: four management tests failed with expected assertions before the fix (run `35074906448`, job `104724888883`). After the fix, all four management tests and seven helper tests passed (154 shared tests, zero failures). Final Android compilation/build must also pass the PR Check before merge.
+
+## Integration gate
+
+Temporary self-writing workflows and patch scripts have been removed. The final PR must pass PR Check (Android/shared unit tests + assembleDebug), Runtime regression checks and Bundled extension contracts at its final head before merge. Build only a signed stable release after merge; leave Nightly manual-only.
 
 ## Explicit boundary
 
-R06 (uncooperative extension-handler lifetime) and R08 (queue flow control) need separate ownership/transport changes and stress tests. This PR must not pretend that a Promise.race cancels arbitrary extension code, or silently drop tool/result events by shrinking a Channel. Existing PR #10 repairs are retained; these two risks are not declared solved by contract/typecheck work.
+R06 (uncooperative extension-handler lifetime) and R08 (queue flow control) remain open. They need separate ownership/transport changes and stress tests. A timeout alone does not cancel arbitrary extension code; shrinking a Channel must not silently lose protocol events. Existing PR #10 repairs are retained, but these two risks are not declared solved by this patch.

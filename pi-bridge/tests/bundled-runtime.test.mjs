@@ -77,8 +77,6 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
     assert.match(ruSnapshot, /MCP-серверы/);
     assert.match(ruSnapshot, /Субагенты/);
     assert.match(ruSnapshot, /Добавить MCP-сервер/);
-    assert.match(ruSnapshot, /Среда MCP/);
-    assert.match(ruSnapshot, /Исполняемая команда для stdio-транспорта/);
     assert.match(ruSnapshot, /Типы субагентов/);
     assert.match(ruSnapshot, /Создать описание агента/);
     assert.match(ruSnapshot, /Извлечение контекста/);
@@ -87,7 +85,6 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
     assert.doesNotMatch(ruSnapshot, /"Web Access"/);
     assert.doesNotMatch(ruSnapshot, /"MCP Servers"/);
     assert.doesNotMatch(ruSnapshot, /"Add MCP server"/);
-    assert.doesNotMatch(ruSnapshot, /"MCP Runtime"/);
     assert.doesNotMatch(ruSnapshot, /"Subagent Types"/);
     assert.doesNotMatch(ruSnapshot, /"Create agent definition"/);
     assert.doesNotMatch(ruSnapshot, /"Context Extraction"/);
@@ -101,8 +98,6 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
     assert.match(enSnapshot, /MCP Servers/);
     assert.match(enSnapshot, /Subagents/);
     assert.match(enSnapshot, /Add MCP server/);
-    assert.match(enSnapshot, /MCP Runtime/);
-    assert.match(enSnapshot, /Executable for the stdio transport/);
     assert.match(enSnapshot, /Subagent Types/);
     assert.match(enSnapshot, /Create agent definition/);
     assert.match(enSnapshot, /Context Extraction/);

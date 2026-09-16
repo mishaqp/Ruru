@@ -1,0 +1,28 @@
+name: Publish verified Ruru 0.1.4 stable
+on:
+  push:
+    branches: ['ops/dispatch-ruru-0.1.4']
+    paths: ['.github/workflows/dispatch-ruru-0.1.4.yml']
+permissions:
+  contents: read
+  actions: write
+jobs:
+  dispatch:
+    if: github.repository == 'mishaqp/Ruru' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Dispatch only the normal signed release on the verified main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='e2e2bca7606d506c7e290e8cffac5b685ab9f124'
+          actual="$(gh api repos/mishaqp/Ruru/branches/main --jq .commit.sha)"
+          test "$actual" = "$expected" || { echo 'main moved; refusing to release unreviewed code'; exit 1; }
+          gh api --method POST repos/mishaqp/Ruru/actions/workflows/release-ruru.yml/dispatches \
+            --input - <<'JSON'
+          {"ref":"main","inputs":{"version_name":"0.1.4-ruru.1","version_code":"10401"}}
+          JSON
+          echo 'Dispatched Release Ruru APK for 0.1.4-ruru.1, versionCode 10401.'

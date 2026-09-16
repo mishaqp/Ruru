@@ -3,38 +3,49 @@ on:
   push:
     branches: ['fix/android-only-audit-followup']
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: android-audit-work
   cancel-in-progress: true
 jobs:
-  reproduce:
+  repair:
+    if: github.ref == 'refs/heads/fix/android-only-audit-followup'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false
+          ref: fix/android-only-audit-followup
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
       - run: npm ci --no-audit --no-fund
         working-directory: pi-bridge
-      - run: npm run build
-        working-directory: pi-bridge
-      - name: Reproduce old callback deadline failures
+      - name: Apply reviewed R06 patch
+        run: python3 scripts/apply-r06-followup.py
+      - name: Locale and TypeScript checks
+        run: |
+          python3 scripts/check-ruru-locales.py
+          cd pi-bridge
+          npm run check
+      - name: Run all bridge and bundled-runtime regressions
         working-directory: pi-bridge
         shell: bash
+        run: npm test 2>&1 | tee ../r06-green.log
+      - name: Commit verified patch on this branch only
+        shell: bash
         run: |
-          set +e
-          node --test tests/extension-deadline.test.mjs 2>&1 | tee ../r06-red.log
-          status=${PIPESTATUS[0]}
-          set -e
-          test "$status" -ne 0
-          grep -q 'OUTER DEADLINE\|Missing expected rejection' ../r06-red.log
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add pi-bridge/src/aether-extensions.ts packages/extension-api/src/index.ts
+          git rm scripts/apply-r06-followup.py .github/workflows/android-audit-work.yml
+          git diff --cached --check
+          git commit -m 'fix: bound extension callbacks and revoke stale SDK writes'
+          git push origin HEAD:refs/heads/fix/android-only-audit-followup
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: android-audit-red
-          path: r06-red.log
+          name: android-audit-r06
+          path: r06-green.log
           retention-days: 7

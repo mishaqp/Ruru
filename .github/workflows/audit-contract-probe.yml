@@ -9,6 +9,17 @@ concurrency:
   group: extension-contract-probe
   cancel-in-progress: false
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: npm ci --no-audit --no-fund
+        working-directory: pi-bridge
+      - run: node --test tests/extension-contracts.test.mjs
+        working-directory: pi-bridge
   probe:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -29,9 +40,9 @@ jobs:
           cd "extensions/$PACKAGE"
           echo "Node: $(node --version)"
           if test -f package-lock.json; then
-            npm ci --ignore-scripts --omit=optional --legacy-peer-deps --no-audit --no-fund 2>&1 | tee ../../install-$PACKAGE.log
+            npm ci --ignore-scripts --include=optional --legacy-peer-deps --no-audit --no-fund 2>&1 | tee ../../install-$PACKAGE.log
           else
-            npm install --ignore-scripts --omit=optional --legacy-peer-deps --no-audit --no-fund 2>&1 | tee ../../install-$PACKAGE.log
+            npm install --ignore-scripts --include=optional --legacy-peer-deps --no-audit --no-fund 2>&1 | tee ../../install-$PACKAGE.log
           fi
           npm run typecheck 2>&1 | tee ../../typecheck-$PACKAGE.log
       - uses: actions/upload-artifact@v7

@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { runMediaProcess } from "./media-process.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import { isGeminiWebAvailable, queryWithCookies } from "./gemini-web.ts";
@@ -152,12 +152,12 @@ function mapYtDlpError(err: unknown): string {
 	return snippet ? `yt-dlp failed: ${snippet}` : "yt-dlp failed";
 }
 
-export async function getYouTubeStreamInfo(videoId: string): Promise<StreamResult> {
+export async function getYouTubeStreamInfo(videoId: string, signal?: AbortSignal): Promise<StreamResult> {
 	try {
-		const output = execFileSync("yt-dlp", [
+		const output = (await runMediaProcess("yt-dlp", [
 			"--print", "duration",
 			"-g", `https://www.youtube.com/watch?v=${videoId}`,
-		], { timeout: 15000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+		], { timeout: 15000, signal })).toString("utf8").trim();
 		const lines = output.split(/\r?\n/);
 		const rawDuration = lines[0]?.trim();
 		const streamUrl = lines[1]?.trim();
@@ -170,12 +170,12 @@ export async function getYouTubeStreamInfo(videoId: string): Promise<StreamResul
 	}
 }
 
-async function extractFrameFromStream(streamUrl: string, seconds: number): Promise<FrameResult> {
+async function extractFrameFromStream(streamUrl: string, seconds: number, signal?: AbortSignal): Promise<FrameResult> {
 	try {
-		const buffer = execFileSync("ffmpeg", [
+		const buffer = await runMediaProcess("ffmpeg", [
 			"-ss", String(seconds), "-i", streamUrl,
 			"-frames:v", "1", "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1",
-		], { maxBuffer: 5 * 1024 * 1024, timeout: 30000, stdio: ["pipe", "pipe", "pipe"] });
+		], { maxBuffer: 5 * 1024 * 1024, timeout: 30000, signal });
 		if (buffer.length === 0) return { error: "ffmpeg failed: empty output" };
 		return { data: buffer.toString("base64"), mimeType: "image/jpeg" };
 	} catch (err) {
@@ -187,21 +187,23 @@ export async function extractYouTubeFrame(
 	videoId: string,
 	seconds: number,
 	streamInfo?: StreamInfo,
+	signal?: AbortSignal,
 ): Promise<FrameResult> {
-	const info = streamInfo ?? await getYouTubeStreamInfo(videoId);
+	const info = streamInfo ?? await getYouTubeStreamInfo(videoId, signal);
 	if ("error" in info) return info;
-	return extractFrameFromStream(info.streamUrl, seconds);
+	return extractFrameFromStream(info.streamUrl, seconds, signal);
 }
 
 export async function extractYouTubeFrames(
 	videoId: string,
 	timestamps: number[],
 	streamInfo?: StreamInfo,
+	signal?: AbortSignal,
 ): Promise<{ frames: VideoFrame[]; duration: number | null; error: string | null }> {
-	const info = streamInfo ?? await getYouTubeStreamInfo(videoId);
+	const info = streamInfo ?? await getYouTubeStreamInfo(videoId, signal);
 	if ("error" in info) return { frames: [], duration: null, error: info.error };
 	const results = await Promise.all(timestamps.map(async (t) => {
-		const frame = await extractFrameFromStream(info.streamUrl, t);
+		const frame = await extractFrameFromStream(info.streamUrl, t, signal);
 		if ("error" in frame) return { error: frame.error };
 		return { ...frame, timestamp: formatSeconds(t) };
 	}));

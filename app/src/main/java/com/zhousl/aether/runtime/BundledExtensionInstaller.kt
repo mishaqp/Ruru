@@ -129,7 +129,7 @@ internal class BundledExtensionInstaller(
         relative: String = "",
     ): Boolean {
         val directory = if (relative.isEmpty()) source else File(source, relative)
-        for (entry in directory.listFiles().orEmpty()) {
+        for (entry in checkNotNull(directory.listFiles()) { "Unable to read bundled extension directory." }) {
             val path = if (relative.isEmpty()) entry.name else "$relative/${entry.name}"
             if (path == manifestName) continue
             // Never traverse a symlink supplied by an imported or edited package.
@@ -193,7 +193,7 @@ internal class BundledExtensionInstaller(
             val hashes = sortedMapOf<String, String>()
             fun visit(directory: File, prefix: String) {
                 check(!Files.isSymbolicLink(directory.toPath())) { "Symlink in bundled assets." }
-                for (entry in directory.listFiles().orEmpty()) {
+                for (entry in checkNotNull(directory.listFiles()) { "Unable to read bundled extension directory." }) {
                     val relative = if (prefix.isEmpty()) entry.name else "$prefix/${entry.name}"
                     if (relative == manifestName || relative == "node_modules") continue
                     check(!Files.isSymbolicLink(entry.toPath())) { "Symlink in bundled assets." }

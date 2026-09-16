@@ -347,7 +347,7 @@
     <string name="settings_privacy_policy">Политика конфиденциальности</string>
     <string name="settings_download_and_install">Скачать и установить</string>
     <string name="settings_root_setup_progress_body_running">Ruru запрашивает su, включает доступ к командам Termux и готовит режим агента через Root.</string>
-    <string name="settings_root_setup_progress_body_ready">Доступ к командам Termux и авторизация Режим агента через Root готовы.</string>
+    <string name="settings_root_setup_progress_body_ready">Доступ к командам Termux и авторизация режима агента через Root готовы.</string>
     <string name="settings_root_setup_progress_body_available">Запустите настройку, чтобы выдать su и завершить конфигурацию локального доступа.</string>
     <string name="settings_root_setup_progress_body_unavailable">На устройстве не найден бинарник su.</string>
     <string name="settings_root_setup_progress_body_permission_denied">Выдайте su для Ruru и повторите автоматическую настройку Root.</string>
@@ -357,7 +357,7 @@
     <string name="settings_custom_instructions_variables_hint">Поддерживаются {{current_datetime}}, {{current_date}}, {{current_time}}, {{timezone}} и {{unix_timestamp}}.</string>
     <string name="settings_agent_mode_unavailable_body">Сначала настройте Termux. Режим агента использует мост Termux для рабочей области и снимков экрана, поэтому авторизацию нельзя включить, пока Termux не готов.</string>
     <string name="settings_agent_mode_root_already_configured_body">Авторизация режима агента через Root уже готова. Повторно запускать автоматическую настройку Root не нужно.</string>
-    <string name="settings_agent_mode_already_configured_body">Авторизация режима агента уже готова. Автоматическая настройка Root не требуется; продолжение переключит Режим агента на Root.</string>
+    <string name="settings_agent_mode_already_configured_body">Авторизация режима агента уже готова. Автоматическая настройка Root не требуется; продолжение переключит режим агента на Root.</string>
     <string name="settings_agent_mode_root_setup_body">Используйте su, чтобы выбрать режим Root и автоматически подготовить управление устройством.</string>
     <string name="settings_developer">Настройки разработчика</string>
     <string name="settings_about">О приложении</string>
@@ -672,7 +672,7 @@
     <string name="onboarding_agent_mode_choose_method">Выберите способ авторизации или пропустите пока.</string>
     <string name="onboarding_agent_mode_shizuku_subtitle">Использовать привилегированный сервис Shizuku, когда приложение установлено.</string>
     <string name="onboarding_agent_mode_root_subtitle">Использовать root-оболочку для привилегированного ввода на устройствах с root.</string>
-    <string name="onboarding_agent_mode_skip_subtitle">Оставить Режим агента выключенным и включить позже в настройках.</string>
+    <string name="onboarding_agent_mode_skip_subtitle">Оставить режим агента выключенным и включить позже в настройках.</string>
     <string name="onboarding_paste_it_here">Вставьте здесь</string>
 
     <!-- Conversation -->
@@ -750,15 +750,15 @@
     <string name="tool_title_checked_root_setup">Настройка Root проверена</string>
     <string name="tool_title_checking_termux_setup">Проверка настройки Termux</string>
     <string name="tool_title_checked_termux_setup">Настройка Termux проверена</string>
-    <string name="tool_title_updating_agent_mode_authorization">Обновление авторизации Режим агента</string>
+    <string name="tool_title_updating_agent_mode_authorization">Обновление авторизации режима агента</string>
     <string name="tool_title_updated_agent_mode_authorization">Авторизация режима агента обновлена</string>
     <string name="tool_title_requesting_shizuku_permission">Запрос разрешения Shizuku</string>
     <string name="tool_title_requested_shizuku_permission">Разрешение Shizuku запрошено</string>
     <string name="tool_title_stopping_agent_mode_display">Остановка дисплея режима агента</string>
     <string name="tool_title_stopped_agent_mode_display">Дисплей режима агента остановлен</string>
-    <string name="tool_title_refreshing_agent_mode_displays">Обновление дисплеев режиме агента</string>
-    <string name="tool_title_refreshed_agent_mode_displays">Дисплеи Режим агента обновлены</string>
-    <string name="tool_title_checking_agent_mode_authorization">Проверка авторизации Режим агента</string>
+    <string name="tool_title_refreshing_agent_mode_displays">Обновление дисплеев режима агента</string>
+    <string name="tool_title_refreshed_agent_mode_displays">Дисплеи режима агента обновлены</string>
+    <string name="tool_title_checking_agent_mode_authorization">Проверка авторизации режима агента</string>
     <string name="tool_title_checked_agent_mode_authorization">Авторизация режима агента проверена</string>
     <string name="tool_title_reading_scheduled_tasks">Чтение запланированных задач</string>
     <string name="tool_title_read_scheduled_tasks">Запланированные задачи прочитаны</string>

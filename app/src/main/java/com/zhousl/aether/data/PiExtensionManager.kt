@@ -458,7 +458,15 @@ class PiExtensionManager(
         }
     }
 
-    suspend fun remove(extension: InstalledPiExtension): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun remove(extension: InstalledPiExtension): Result<Unit> =
+        removeWithStatus(extension).mapCatching { response ->
+            requireExtensionReloadSucceeded(response.optJSONObject("reload"))
+            Unit
+        }
+
+    // Keep the structured deletion/reload result for agent callers. The UI wrapper
+    // above retains its Result<Unit> contract without issuing a second reload.
+    suspend fun removeWithStatus(extension: InstalledPiExtension): Result<JSONObject> = withContext(Dispatchers.IO) {
         runCatching {
             stateRepository.setEnabled(extension.id, enabled = true)
             when (extension.kind) {
@@ -470,19 +478,15 @@ class PiExtensionManager(
                     require(response.optBoolean("removed")) {
                         "No installed Pi extension matched ${extension.source}."
                     }
-                    requireExtensionReloadSucceeded(
-                        piKernelBridge.reloadAllExtensions(stateRepository.loadOptions())
-                    )
+                    response
                 }
 
                 PiExtensionInstallKind.Imported -> {
                     removeImportedExtension(extension.installedPath)
-                    requireExtensionReloadSucceeded(
-                        piKernelBridge.reloadAllExtensions(stateRepository.loadOptions())
-                    )
+                    val reload = piKernelBridge.reloadAllExtensions(stateRepository.loadOptions())
+                    JSONObject().put("removed", true).put("removed_from_disk", true).put("reload", reload)
                 }
             }
-            Unit
         }
     }
 

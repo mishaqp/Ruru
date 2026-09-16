@@ -67,7 +67,7 @@ export function guardExtensionApi<T extends object>(api: T): T {
         const value = Reflect.get(target, key, receiver);
         if (typeof value === "function") {
           const cached = methods.get(key);
-          if (cached?.source === value) return cached.wrapped;
+          if (cached && cached.source === value) return cached.wrapped;
           const wrapped = (...args: unknown[]) => {
             assertLiveOperation();
             const result: unknown = Reflect.apply(value, target, args);

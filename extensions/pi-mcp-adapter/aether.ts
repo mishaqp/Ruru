@@ -10,158 +10,29 @@ import {
   type McpAetherSnapshot,
 } from "./aether-bridge.ts";
 
-type AetherJsonObject = Record<string, unknown>;
-type AetherView = AetherJsonObject | AetherView[] | string | null | undefined;
-type AetherRenderContext = AetherJsonObject & { storage: AetherJsonObject };
-
-export interface AetherSettingOption {
-  value: string;
-  label: string;
-}
-
-export interface AetherSettingActionItem {
-  label: string;
-  action: string;
-  args?: AetherJsonObject;
-  category?: string;
-  tone?: "primary" | "neutral" | "danger";
-  enabled?: boolean;
-}
-
-export interface AetherSettingDetailItem {
-  label: string;
-  value: string;
-}
-
-export interface AetherSettingDefinition {
-  id: string;
-  label?: string;
-  title?: string;
-  description?: string;
-  subtitle?: string;
-  tag?: string;
-  pill?: string;
-  badge?: string;
-  type?:
-    | "text"
-    | "password"
-    | "textarea"
-    | "number"
-    | "toggle"
-    | "select"
-    | "dropdown"
-    | "segmented"
-    | "tab"
-    | "tabs"
-    | "slider"
-    | "button"
-    | "link"
-    | "label"
-    | "divider"
-    | "spacer"
-    | "item-card"
-    | "card"
-    | "empty-state"
-    | "choice"
-    | "radio"
-    | "action-row"
-    | "chips"
-    | "detail-line"
-    | "key-value"
-    | "pill"
-    | "badge"
-    | "result-card"
-    | "callout";
-  default?: string | number | boolean;
-  placeholder?: string;
-  options?: AetherSettingOption[];
-  min?: number;
-  max?: number;
-  step?: number;
-  action?: string;
-  args?: AetherJsonObject;
-  category?: string;
-  url?: string;
-  icon?: string;
-  tone?: "primary" | "neutral" | "danger";
-  enabled?: boolean;
-  checked?: boolean;
-  selected?: boolean;
-  toggleAction?: string;
-  editAction?: string;
-  editCategory?: string;
-  editArgs?: AetherJsonObject;
-  deleteAction?: string;
-  deleteArgs?: AetherJsonObject;
-  expanded?: boolean;
-  actions?: AetherSettingActionItem[];
-  details?: AetherSettingDetailItem[];
-  resultText?: string;
-  result?: string;
-  buttonLabel?: string;
-  multiline?: boolean;
-  secret?: boolean;
-  settings?: AetherSettingDefinition[];
-}
-
-export interface AetherSettingsSection {
-  id?: string;
-  title?: string;
-  description?: string;
-  settings: AetherSettingDefinition[];
-}
-
-export interface AetherSettingsCategory {
-  id: string;
-  title: string;
-  subtitle?: string;
-  icon?: string;
-  order?: number;
-  trailingIcon?: string;
-  trailingAction?: string;
-  trailingCategory?: string;
-  trailingArgs?: AetherJsonObject;
-  hidden?: boolean;
-  sections: AetherSettingsSection[];
-}
-
-export interface AetherSettingsDefinition {
-  id: string;
-  title: string;
-  subtitle?: string;
-  icon?: string;
-  order?: number;
-  trailingIcon?: string;
-  trailingAction?: string;
-  trailingCategory?: string;
-  trailingArgs?: AetherJsonObject;
-  sections?: AetherSettingsSection[];
-  categories?: AetherSettingsCategory[];
-}
-
-export interface AetherExtensionAPI {
-  ui: {
-    node(type: string, properties?: AetherJsonObject, children?: AetherView[]): AetherJsonObject;
-    text(text: string, properties?: AetherJsonObject): AetherJsonObject;
-    column(children: AetherView[], properties?: AetherJsonObject): AetherJsonObject;
-    row(children: AetherView[], properties?: AetherJsonObject): AetherJsonObject;
-    card(children: AetherView[], properties?: AetherJsonObject): AetherJsonObject;
-    button(label: string, action: string, properties?: AetherJsonObject): AetherJsonObject;
-  };
-  host: { invoke(method: string, args?: AetherJsonObject): Promise<AetherJsonObject> };
-  storage: {
-    get<T = unknown>(key: string, fallback?: T): T;
-    set(key: string, value: unknown): void;
-    delete(key: string): void;
-    snapshot(): AetherJsonObject;
-  };
-  messages: { append(type: string, payload?: AetherJsonObject, text?: string): Promise<AetherJsonObject> };
-  registerSettings(definition: AetherSettingsDefinition): () => void;
-  registerAction(id: string, handler: (payload: AetherJsonObject) => unknown | Promise<unknown>): () => void;
-  registerToolTitle?(toolName: string, runningTitle: string, completedTitle: string, priority?: number): () => void;
-  invalidate(): void;
-  notify(message: string, level?: "info" | "warning" | "error"): void;
-}
+import type {
+  AetherJsonObject,
+  AetherView,
+  AetherRenderContext,
+  AetherSettingDefinition,
+  AetherSettingsSection,
+  AetherExtensionAPI,
+  AetherSettingOption,
+  AetherSettingActionItem,
+  AetherSettingDetailItem,
+  AetherSettingsCategory,
+  AetherSettingsDefinition,
+} from "@baimoqilin/aether-extension-api";
+export type {
+  AetherSettingDefinition,
+  AetherExtensionAPI,
+  AetherSettingOption,
+  AetherSettingActionItem,
+  AetherSettingDetailItem,
+  AetherSettingsCategory,
+  AetherSettingsDefinition,
+  AetherSettingsSection,
+} from "@baimoqilin/aether-extension-api";
 
 const PAGE_ID = "mcp-settings";
 const BRIDGE_OAUTH_KEY = "mcp:oauth-pending";

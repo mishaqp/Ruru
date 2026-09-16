@@ -24,83 +24,15 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-type AetherJsonObject = Record<string, unknown>;
-type AetherView = AetherJsonObject | AetherView[] | string | null | undefined;
-type AetherRenderContext = AetherJsonObject & { storage: AetherJsonObject };
-type AetherSettingDefinition = {
-	id: string;
-	label: string;
-	description?: string;
-	type?: "text" | "number" | "toggle" | "select" | "slider" | "password" | "textarea" | "button";
-	default?: string | number | boolean;
-	placeholder?: string;
-	options?: Array<{ value: string; label: string }>;
-	min?: number;
-	max?: number;
-	step?: number;
-	action?: string;
-	args?: AetherJsonObject;
-	tone?: "primary" | "neutral" | "danger";
-	icon?: string;
-};
-type AetherSettingsSection = {
-	id?: string;
-	title?: string;
-	description?: string;
-	settings: AetherSettingDefinition[];
-};
-type AetherMessageTypeDefinition = {
-	type: string;
-	title?: string;
-	icon?: string;
-	render: AetherView | ((context: AetherRenderContext & { message: AetherJsonObject }) => AetherView | Promise<AetherView>);
-};
-type AetherExtensionAPI = {
-	ui: {
-		node(type: string, properties?: AetherJsonObject, children?: AetherView[]): AetherJsonObject;
-		text(text: string, properties?: AetherJsonObject): AetherJsonObject;
-		code(text: string, properties?: AetherJsonObject): AetherJsonObject;
-		column(children: AetherView[], properties?: AetherJsonObject): AetherJsonObject;
-		row(children: AetherView[], properties?: AetherJsonObject): AetherJsonObject;
-		card(children: AetherView[], properties?: AetherJsonObject): AetherJsonObject;
-		button(label: string, action: string, properties?: AetherJsonObject): AetherJsonObject;
-		input(value: string, action: string, properties?: AetherJsonObject): AetherJsonObject;
-	};
-	host: { invoke(method: string, args?: AetherJsonObject): Promise<AetherJsonObject> };
-	storage: {
-		get<T = unknown>(key: string, fallback?: T): T;
-		set(key: string, value: unknown): void;
-		delete(key: string): void;
-		snapshot(): AetherJsonObject;
-	};
-	messages: { append(type: string, payload?: AetherJsonObject, text?: string): Promise<AetherJsonObject> };
-	registerSettings(definition: {
-		id: string;
-		title: string;
-		subtitle?: string;
-		icon?: string;
-		order?: number;
-		sections?: AetherSettingsSection[];
-		categories?: Array<{
-			id: string;
-			title: string;
-			subtitle?: string;
-			icon?: string;
-			order?: number;
-			sections: AetherSettingsSection[];
-		}>;
-	}): () => void;
-	registerMessageType(definition: AetherMessageTypeDefinition): () => void;
-	registerComposerMenuItem(definition: AetherJsonObject & { id: string; title: string }): () => void;
-	registerSurface(slot: string, definition: AetherJsonObject & {
-		render?: AetherView | ((context: AetherRenderContext) => AetherView | Promise<AetherView>);
-	}): () => void;
-	registerAction(id: string, handler: (payload: AetherJsonObject, context?: AetherRenderContext) => unknown | Promise<unknown>): () => void;
-	registerToolTitle?(toolName: string, runningTitle: string, completedTitle: string, priority?: number): () => void;
-	on?(event: string, handler: (payload: AetherJsonObject) => unknown | Promise<unknown>): () => void;
-	invalidate(): void;
-	notify(message: string, level?: "info" | "warning" | "error"): void;
-};
+import type {
+  AetherJsonObject,
+  AetherView,
+  AetherRenderContext,
+  AetherSettingDefinition,
+  AetherSettingsSection,
+  AetherExtensionAPI,
+  AetherMessageTypeDefinition,
+} from "@baimoqilin/aether-extension-api";
 
 // ---- Bridge to the Pi extension -------------------------------------------
 // The Pi extension and this Script Mod are loaded by separate jiti loaders.

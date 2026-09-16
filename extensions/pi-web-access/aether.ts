@@ -2,75 +2,16 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname } from "node:path";
 import { getWebSearchConfigPath } from "./utils.ts";
 
-type AetherJsonObject = Record<string, unknown>;
-type AetherView = AetherJsonObject | AetherView[] | string | null | undefined;
-type AetherRenderContext = AetherJsonObject & { storage: AetherJsonObject };
-type AetherSettingDefinition = {
-	id: string;
-	label: string;
-	description?: string;
-	type?: "text" | "number" | "toggle" | "select" | "slider" | "password";
-	default?: string | number | boolean;
-	placeholder?: string;
-	options?: Array<{ value: string; label: string }>;
-	min?: number;
-	max?: number;
-	step?: number;
-};
-type AetherSettingsSection = {
-	id?: string;
-	title?: string;
-	description?: string;
-	settings: AetherSettingDefinition[];
-};
-type AetherSettingsCategory = {
-	id: string;
-	title: string;
-	subtitle?: string;
-	icon?: string;
-	order?: number;
-	sections: AetherSettingsSection[];
-};
-type AetherMessageTypeDefinition = {
-	type: string;
-	title?: string;
-	icon?: string;
-	render: AetherView | ((context: AetherRenderContext & { message: AetherJsonObject }) => AetherView | Promise<AetherView>);
-};
-type AetherExtensionAPI = {
-	ui: {
-		node(type: string, properties?: AetherJsonObject, children?: AetherView[]): AetherJsonObject;
-		text(text: string, properties?: AetherJsonObject): AetherJsonObject;
-		column(children: AetherView[], properties?: AetherJsonObject): AetherJsonObject;
-		row(children: AetherView[], properties?: AetherJsonObject): AetherJsonObject;
-		card(children: AetherView[], properties?: AetherJsonObject): AetherJsonObject;
-		button(label: string, action: string, properties?: AetherJsonObject): AetherJsonObject;
-	};
-	host: { invoke(method: string, args?: AetherJsonObject): Promise<AetherJsonObject> };
-	storage: {
-		get<T = unknown>(key: string, fallback?: T): T;
-		set(key: string, value: unknown): void;
-		delete(key: string): void;
-		snapshot(): AetherJsonObject;
-	};
-	messages: { append(type: string, payload?: AetherJsonObject, text?: string): Promise<AetherJsonObject> };
-	registerSettings(definition: {
-		id: string;
-		title: string;
-		subtitle?: string;
-		icon?: string;
-		order?: number;
-		sections?: AetherSettingsSection[];
-		categories?: AetherSettingsCategory[];
-	}): () => void;
-	registerMessageType(definition: AetherMessageTypeDefinition): () => void;
-	registerComposerMenuItem(definition: AetherJsonObject & { id: string; title: string }): () => void;
-	registerSurface(slot: string, definition: AetherJsonObject & {
-		render?: AetherView | ((context: AetherRenderContext) => AetherView | Promise<AetherView>);
-	}): () => void;
-	registerAction(id: string, handler: (payload: AetherJsonObject) => unknown | Promise<unknown>): () => void;
-	registerToolTitle?(toolName: string, runningTitle: string, completedTitle: string, priority?: number): () => void;
-};
+import type {
+  AetherJsonObject,
+  AetherView,
+  AetherRenderContext,
+  AetherSettingDefinition,
+  AetherSettingsSection,
+  AetherExtensionAPI,
+  AetherSettingsCategory,
+  AetherMessageTypeDefinition,
+} from "@baimoqilin/aether-extension-api";
 
 const SETTINGS_PAGE_ID = "web-access-settings";
 const BRIDGE_KEY = Symbol.for("pi-web-access.aether-bridge");

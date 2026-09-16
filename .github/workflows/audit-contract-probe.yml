@@ -2,7 +2,7 @@ name: Audit contracts development check
 on:
   push:
     branches: ['fix/audit-contracts-no-nightly']
-    paths: ['.github/workflows/audit-contract-probe.yml', 'scripts/audit-contracts-dev.py']
+    paths: ['.github/workflows/audit-contract-probe.yml', 'scripts/audit-contracts-dev.py', 'scripts/audit-removal-dev.py']
 permissions:
   contents: write
 concurrency:
@@ -38,11 +38,9 @@ jobs:
           npm ci --prefix packages/extension-api --no-audit --no-fund
           npm run check --prefix packages/extension-api
       - name: Check all bundled source and SDK contracts
-        if: hashFiles('scripts/audit-contracts-dev.py') != ''
         shell: bash
         run: node scripts/check-bundled-extension-types.mjs 2>&1 | tee bundled-types.log
       - name: Check locale, bridge and real bundled runtime
-        if: hashFiles('scripts/audit-contracts-dev.py') != ''
         shell: bash
         run: |
           python3 scripts/check-ruru-locales.py
@@ -55,4 +53,37 @@ jobs:
           path: |
             bundled-types.log
             runtime-tests.log
+          retention-days: 7
+  removal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: enhanced
+          cache-read-only: false
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+      - name: Reproduce removal lifecycle before the production fix
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew :shared:testDebugUnitTest --tests '*ExtensionRemovalManagementTest' --stacktrace 2>&1 | tee removal-tests.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: removal-reproducer
+          path: |
+            removal-tests.log
+            shared/build/test-results/**
           retention-days: 7

@@ -4,48 +4,55 @@ on:
     branches: ['fix/audit-contracts-no-nightly']
     paths: ['.github/workflows/audit-contract-probe.yml', 'scripts/audit-contracts-dev.py']
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: audit-contract-probe
   cancel-in-progress: true
 jobs:
-  inspect:
+  repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Install bridge compiler and locked dependencies
-        run: npm ci --prefix pi-bridge --no-audit --no-fund
-      - name: Inspect exact source dependencies and removal call sites
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+      - name: Apply inspected source changes
+        if: hashFiles('scripts/audit-contracts-dev.py') != ''
         shell: bash
         run: |
-          git grep -n -E 'removeExtensionPackage|piExtensionManager.remove|fun remove\(' -- app/src shared/src | head -100
-          git ls-files 'extensions/*/package-lock.json' 'extensions/*/tsconfig*' 'packages/extension-api/*'
-          git grep -n -E 'activateAether|defineAetherExtension|export default' -- extensions/pi-mcp-adapter/aether.ts extensions/pi-web-access/aether.ts extensions/pi-subagents/src/aether.ts
-      - name: Typecheck actual extension sources (diagnostic only)
+          test "$GITHUB_REF_NAME" = 'fix/audit-contracts-no-nightly'
+          python3 scripts/audit-contracts-dev.py
+          npm install --prefix pi-bridge --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --check
+          git add extensions/pi-mcp-adapter/aether.ts extensions/pi-subagents/src/aether.ts extensions/pi-web-access/aether.ts pi-bridge/package.json pi-bridge/package-lock.json
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'fix: check bundled extensions against the shared Aether API'
+            git push origin HEAD:refs/heads/fix/audit-contracts-no-nightly
+          fi
+      - name: Install compiler and SDK
+        run: |
+          npm ci --prefix pi-bridge --no-audit --no-fund
+          npm ci --prefix packages/extension-api --no-audit --no-fund
+          npm run check --prefix packages/extension-api
+      - name: Check all bundled source and SDK contracts
+        if: hashFiles('scripts/audit-contracts-dev.py') != ''
+        shell: bash
+        run: node scripts/check-bundled-extension-types.mjs 2>&1 | tee bundled-types.log
+      - name: Check locale, bridge and real bundled runtime
+        if: hashFiles('scripts/audit-contracts-dev.py') != ''
         shell: bash
         run: |
-          set -o pipefail
-          ln -s "$GITHUB_WORKSPACE/pi-bridge/node_modules" node_modules
-          mkdir -p audit-type-reports
-          for name in pi-mcp-adapter pi-subagents pi-web-access; do
-            echo "::group::$name"
-            npm install --prefix "extensions/$name" --omit=dev --omit=optional --legacy-peer-deps --ignore-scripts --no-audit --no-fund > "audit-type-reports/$name-install.txt" 2>&1 || { cat "audit-type-reports/$name-install.txt"; exit 1; }
-            set +e
-            node pi-bridge/node_modules/typescript/bin/tsc -p "extensions/$name/tsconfig.json" --noEmit --pretty false 2>&1 | tee "audit-type-reports/$name-types.txt"
-            result=${PIPESTATUS[0]}
-            set -e
-            echo "$name compiler exit: $result"
-            echo "::endgroup::"
-          done
+          python3 scripts/check-ruru-locales.py
+          npm run check --prefix pi-bridge
+          npm test --prefix pi-bridge 2>&1 | tee runtime-tests.log
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: extension-type-probe
-          path: audit-type-reports/
+          name: contract-repair-reports
+          path: |
+            bundled-types.log
+            runtime-tests.log
           retention-days: 7

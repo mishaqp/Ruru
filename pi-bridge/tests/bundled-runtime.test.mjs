@@ -67,6 +67,7 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
       assert.ok(inventory.extension_paths.some(p => p.startsWith(join(root, name) + "/")), `${name} not registered: ${JSON.stringify(inventory)}`);
     }
     assert.ok(inventory.tools.length > 3);
+
     const ui = await request("reload_aether_extensions", { context: { platform: "android", language: "ru" } });
     assert.equal(ui.reloaded, true, JSON.stringify(ui));
     assert.deepEqual(ui.snapshot.errors, [], JSON.stringify(ui.snapshot.errors));
@@ -75,19 +76,41 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
     assert.match(ruSnapshot, /Веб-доступ/);
     assert.match(ruSnapshot, /MCP-серверы/);
     assert.match(ruSnapshot, /Субагенты/);
+    assert.match(ruSnapshot, /Добавить MCP-сервер/);
+    assert.match(ruSnapshot, /Среда MCP/);
+    assert.match(ruSnapshot, /Исполняемая команда для stdio-транспорта/);
+    assert.match(ruSnapshot, /Типы субагентов/);
+    assert.match(ruSnapshot, /Создать описание агента/);
+    assert.match(ruSnapshot, /Извлечение контекста/);
+    assert.match(ruSnapshot, /Конфиденциальность и сеть/);
+    assert.match(ruSnapshot, /Исходные результаты/);
     assert.doesNotMatch(ruSnapshot, /"Web Access"/);
     assert.doesNotMatch(ruSnapshot, /"MCP Servers"/);
+    assert.doesNotMatch(ruSnapshot, /"Add MCP server"/);
+    assert.doesNotMatch(ruSnapshot, /"Subagent Types"/);
+    assert.doesNotMatch(ruSnapshot, /"Context Extraction"/);
+
+    // Switching to English must restore the untouched source presentation.
     const enUi = await request("reload_aether_extensions", { context: { platform: "android", language: "en" } });
     const enSnapshot = JSON.stringify(enUi.snapshot);
     assert.match(enSnapshot, /Web Access/);
     assert.match(enSnapshot, /MCP Servers/);
     assert.match(enSnapshot, /Subagents/);
+    assert.match(enSnapshot, /Add MCP server/);
+    assert.match(enSnapshot, /MCP Runtime/);
+    assert.match(enSnapshot, /Executable for the stdio transport/);
+    assert.match(enSnapshot, /Subagent Types/);
+    assert.match(enSnapshot, /Create agent definition/);
+    assert.match(enSnapshot, /Context Extraction/);
+    assert.match(enSnapshot, /Privacy and network/);
+    assert.match(enSnapshot, /Raw results/);
+
     const disabled = names.map(name => join(root, name));
     await request("reload_all_extensions", { disabled_extension_paths: disabled, disabled_package_sources: [] });
     await request("run_turn", { ...turn, disabled_extension_paths: disabled });
     const after = await request("list_extensions", { session_id: turn.session_id });
     assert.ok(after.extension_paths.every(p => !p.startsWith(root + "/")), JSON.stringify(after));
-    console.log(`Bundled native registration: ${inventory.extension_paths.length}; tools: ${inventory.tools.length}; UI settings: ${ui.snapshot.settings.length}; disable/reload: PASS`);
+    console.log(`Bundled native registration: ${inventory.extension_paths.length}; tools: ${inventory.tools.length}; UI settings: ${ui.snapshot.settings.length}; RU/EN localization: PASS; disable/reload: PASS`);
   } finally {
     for (const waiter of pending.values()) clearTimeout(waiter.timer);
     lines.close();

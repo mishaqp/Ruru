@@ -2,7 +2,7 @@ name: Audit repair development
 on:
   push:
     branches: ['fix/audit-stability-no-nightly']
-    paths: ['.github/workflows/audit-development.yml', 'scripts/apply-audit-repairs.py', 'scripts/apply-audit-installer.py']
+    paths: ['.github/workflows/audit-development.yml', 'scripts/apply-audit-media.py']
 permissions:
   contents: write
 concurrency:
@@ -12,7 +12,7 @@ jobs:
   repair:
     if: github.repository == 'mishaqp/Ruru' && github.ref == 'refs/heads/fix/audit-stability-no-nightly'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -24,66 +24,45 @@ jobs:
       - name: Install locked test dependencies
         working-directory: pi-bridge
         run: npm ci --no-audit --no-fund
-      - name: Verify disabled-extension regression fails on the old loader
+      - name: Verify media regression fails on the old process implementation
         working-directory: pi-bridge
         shell: bash
         run: |
-          if ! grep -q 'newly disabled/removed' src/aether-extensions.ts; then
-            npm run build
+          if grep -q 'execFileSync' ../extensions/pi-web-access/video-extract.ts; then
             set +e
-            node --test tests/audit-lifecycle.test.mjs > ../rollback-before.log 2>&1
+            node --test tests/audit-media.test.mjs > ../media-before.log 2>&1
             result=$?
             set -e
-            cat ../rollback-before.log
+            cat ../media-before.log
             test "$result" -ne 0
-            grep -q 'disabled extension survives failed reload' ../rollback-before.log
+            grep -q 'video processing blocked the event loop' ../media-before.log
+            grep -q 'cancelled media was executed' ../media-before.log
           fi
-      - name: Apply fail-closed source patches
+      - name: Apply reviewed source patches
+        run: python3 scripts/apply-audit-media.py
+      - name: Record changes on feature branch only
         run: |
-          python3 scripts/apply-audit-repairs.py
-          python3 scripts/apply-audit-installer.py
-      - name: Record source changes on the feature branch only
-        run: |
-          git add pi-bridge/src/aether-ui-i18n.ts pi-bridge/src/extension-dependencies.ts pi-bridge/src/aether-extensions.ts pi-bridge/tests/bundled-runtime.test.mjs extensions/pi-subagents/src/agent-runner.ts extensions/pi-subagents/src/agent-manager.ts app/src/main/java/com/zhousl/aether/data/pi/PiKernelBridge.kt app/src/main/java/com/zhousl/aether/runtime/AlpineRuntime.kt app/src/main/assets/ruru-extension-baselines
+          git add extensions/pi-web-access/video-extract.ts extensions/pi-web-access/youtube-extract.ts extensions/pi-web-access/extract.ts app/src/main/java/com/zhousl/aether/runtime/BundledExtensionInstaller.kt
           git diff --cached --check
           if ! git diff --cached --quiet; then
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: upgrade verified bundles and honour disabled state after failed reload'
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: avoid blocking the agent during cancellable media extraction'
             git push origin HEAD:refs/heads/fix/audit-stability-no-nightly
           fi
           git rev-parse HEAD
-      - name: Validate locales and TypeScript
+      - name: Validate locale and TypeScript
         run: |
           python3 scripts/check-ruru-locales.py
           cd pi-bridge
           npm run check
+          node node_modules/typescript/bin/tsc --noEmit --module NodeNext --target ES2024 --strict --skipLibCheck --typeRoots node_modules/@types --types node ../extensions/pi-web-access/media-process.ts
       - name: Run all bridge and bundled-extension regression tests
         working-directory: pi-bridge
         shell: bash
         run: npm test 2>&1 | tee ../audit-repair-tests.log
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v6
-        with:
-          cache-provider: enhanced
-          cache-read-only: false
-      - uses: android-actions/setup-android@v4
-        with:
-          packages: 'platform-tools'
-      - name: Android and shared unit tests
-        run: |
-          chmod +x ./gradlew
-          ./gradlew :shared:testDebugUnitTest :app:testDebugUnitTest --stacktrace
-      - name: Debug APK only
-        run: ./gradlew :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: audit-repair-results
+          name: audit-media-results
           path: |
             audit-repair-tests.log
-            rollback-before.log
-            app/build/test-results/**
-            shared/build/test-results/**
-            app/build/outputs/apk/debug/*.apk
+            media-before.log

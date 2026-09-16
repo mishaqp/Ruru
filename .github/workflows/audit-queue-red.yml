@@ -1,0 +1,37 @@
+name: Android queue reproduction (temporary)
+on:
+  push:
+    branches: ['fix/audit-runtime-boundaries']
+    paths: ['.github/workflows/audit-queue-red.yml']
+permissions:
+  contents: read
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: enhanced
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+      - name: Run queue reproducer
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:testDebugUnitTest --tests '*PiBridgeEventQueueTest' --stacktrace 2>&1 | tee queue-tests.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: queue-reproduction
+          path: |
+            queue-tests.log
+            app/build/test-results/**

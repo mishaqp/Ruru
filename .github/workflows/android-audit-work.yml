@@ -3,18 +3,18 @@ on:
   push:
     branches: ['fix/android-only-audit-followup']
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: android-audit-work
   cancel-in-progress: true
 jobs:
-  reproduce_android:
+  repair_android:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false
+          ref: fix/android-only-audit-followup
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -26,41 +26,41 @@ jobs:
       - uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools'
-      - name: Extract unchanged Android queue construction
+      - name: Apply reviewed Android changes
+        run: python3 scripts/apply-android-followup.py
+      - name: Check locales, bridge types and runtime
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('app/src/main/java/com/zhousl/aether/data/pi/PiKernelBridge.kt')
-          s=p.read_text()
-          old='Channel<PiBridgeFrame>(Channel.UNLIMITED)'
-          assert s.count(old)==1
-          p.write_text(s.replace(old,'newPiBridgeEventChannel<PiBridgeFrame>()'))
-          PY
-      - name: Verify R08 and R11 regression failures
-        shell: bash
+          python3 scripts/check-ruru-locales.py
+          cd pi-bridge
+          npm ci --no-audit --no-fund
+          npm run check
+          npm test 2>&1 | tee ../runtime-green.log
+      - name: Android and shared unit tests
         run: |
           chmod +x ./gradlew
-          set +e
-          ./gradlew :app:testDebugUnitTest --tests '*PiBridgeEventQueueTest' --tests '*ExtensionRemovalReportTest' --stacktrace > android-red.log 2>&1
-          status=$?
-          set -e
-          tail -n 90 android-red.log
-          test "$status" -ne 0
-          python3 - <<'PY'
-          from pathlib import Path
-          import xml.etree.ElementTree as ET
-          files=list(Path('app/build/test-results/testDebugUnitTest').glob('TEST-*ReportTest.xml'))+list(Path('app/build/test-results/testDebugUnitTest').glob('TEST-*EventQueueTest.xml'))
-          assert len(files)==2, 'Tests must compile and execute, not fail during build'
-          failures=sum(int(ET.parse(f).getroot().get('failures','0')) for f in files)
-          assert failures==6, f'Expected six specific regressions, got {failures}'
-          print('R08/R11 RED confirmed: six regression failures, two happy paths PASS')
-          PY
+          ./gradlew :shared:testDebugUnitTest :app:testDebugUnitTest --stacktrace
+      - name: Build only Android arm64-v8a debug verification APK
+        run: |
+          ./gradlew :app:assembleDebug --stacktrace
+          python3 scripts/check-ruru-bundle-assets.py app/build/outputs/apk/debug/*.apk
+      - name: Commit verified changes on working branch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/zhousl/aether/data/pi/PiKernelBridge.kt app/src/main/java/com/zhousl/aether/data/PiExtensionManager.kt app/src/main/java/com/zhousl/aether/data/AetherSelfManagementTool.kt app/build.gradle.kts pi-bridge/tests/extension-deadline.test.mjs
+          git rm scripts/apply-android-followup.py .github/workflows/android-audit-work.yml
+          git diff --cached --check
+          git commit -m 'fix(android): bound bridge events and report deferred package removal'
+          git push origin HEAD:refs/heads/fix/android-only-audit-followup
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: android-audit-red
+          name: android-audit-green
           path: |
-            android-red.log
-            app/build/test-results/testDebugUnitTest/**
+            runtime-green.log
+            app/build/test-results/**
+            shared/build/test-results/**
           retention-days: 7

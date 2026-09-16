@@ -306,6 +306,19 @@ const RU_EXTRA_TEXT: Readonly<Record<string, string>> = {
   "Callback URL or authorization code": "Callback URL или код авторизации",
   "Complete OAuth": "Завершить OAuth",
 
+  // Dynamic extension notifications routed through pi-bridge.
+  "Subagent stopped.": "Субагент остановлен.",
+  "Subagent is no longer running.": "Субагент больше не выполняется.",
+  "That agent is not running.": "Этот агент сейчас не выполняется.",
+  "Reloaded subagent definitions.": "Определения субагентов перезагружены.",
+  "Subagent definition prompt added to the composer.": "Запрос на создание субагента добавлен в поле ввода.",
+  "Subagent setting updated.": "Настройка субагента обновлена.",
+  "Subagent setting updated. Some changes apply on the next Pi session.": "Настройка субагента обновлена. Некоторые изменения применятся в следующей сессии Pi.",
+  "The Pi MCP extension is not loaded yet.": "Расширение Pi MCP ещё не загружено.",
+  "MCP extension reloading.": "Расширение MCP перезагружается.",
+  "Authorization URL ready. Open it, approve access, then paste the callback URL back here.": "URL авторизации готов. Откройте его, разрешите доступ и вставьте callback URL сюда.",
+  "Paste the full callback URL or authorization code first.": "Сначала вставьте полный callback URL или код авторизации.",
+
   // MCP descriptions.
   "Executable for the stdio transport, for example npx or uvx.": "Исполняемая команда для stdio-транспорта, например npx или uvx.",
   "One argument per line. Environment interpolation is supported.": "Один аргумент на строку. Поддерживается подстановка переменных среды.",
@@ -520,6 +533,33 @@ function translateDynamicText(value: string): string | undefined {
   if (match) return `Вызов ${match[1]}`;
   match = value.match(/^Called (.+)$/);
   if (match) return `Вызов ${match[1]} завершён`;
+
+  match = value.match(/^Message sent to (.+)\.$/);
+  if (match) return `Сообщение отправлено ${match[1]}.`;
+  match = value.match(/^MCP server "(.+)" (enabled|disabled)\.$/);
+  if (match) return `MCP-сервер "${match[1]}" ${match[2] === "enabled" ? "включён" : "отключён"}.`;
+  match = value.match(/^MCP server "(.+)" added\. Tap Reload MCP extension to connect\.$/);
+  if (match) return `MCP-сервер "${match[1]}" добавлен. Нажмите перезагрузку расширения MCP для подключения.`;
+  match = value.match(/^MCP server "(.+)" removed\. Tap Reload MCP extension to apply\.$/);
+  if (match) return `MCP-сервер "${match[1]}" удалён. Нажмите перезагрузку расширения MCP, чтобы применить изменение.`;
+  match = value.match(/^MCP server "(.+)" renamed to "(.+)"\. Tap Reload MCP extension to apply\.$/);
+  if (match) return `MCP-сервер "${match[1]}" переименован в "${match[2]}". Нажмите перезагрузку расширения MCP, чтобы применить изменение.`;
+  match = value.match(/^Inspection failed: (.+)$/);
+  if (match) return `Проверка не удалась: ${match[1]}`;
+  match = value.match(/^Web Access settings could not read the Pi config: (.+)$/);
+  if (match) return `Не удалось прочитать конфигурацию Pi для веб-доступа: ${match[1]}`;
+
+  // Compound status/stat rows are presentation text assembled by bundled
+  // extensions. Translate only recognized segments and preserve everything else.
+  if (value.includes(" · ")) {
+    const parts = value.split(" · ");
+    const translatedParts = parts.map((part) =>
+      RU_EXTRA_TEXT[part] ?? RU_TEXT[part] ?? translateDynamicText(part) ?? part
+    );
+    if (translatedParts.some((part, index) => part !== parts[index])) {
+      return translatedParts.join(" · ");
+    }
+  }
 
   return undefined;
 }

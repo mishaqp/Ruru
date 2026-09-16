@@ -45,7 +45,7 @@ import {
   ensureExtensionPackageDependencies,
   packageRootForExtensionPath,
 } from "./extension-dependencies.js";
-import { localizeAetherUiSnapshot } from "./aether-ui-i18n.js";
+import { localizeAetherUiSnapshot, localizeAetherUiText } from "./aether-ui-i18n.js";
 
 export interface AetherExtensionTransport {
   requestHost(method: string, args: AetherJsonObject): Promise<AetherJsonObject>;
@@ -727,7 +727,11 @@ function createApi(
     ui,
     host: {
       invoke(method, args = {}) {
-        return transport.requestHost(method, cloneJson(args));
+        const requestArgs = cloneJson(args);
+        if (method === "app.notify" && typeof requestArgs.message === "string") {
+          requestArgs.message = localizeAetherUiText(requestArgs.message, latestHostContext);
+        }
+        return transport.requestHost(method, requestArgs);
       },
     },
     services: {
@@ -1032,7 +1036,7 @@ function createApi(
     },
     invalidate,
     notify(message, level = "info") {
-      transport.notify(message, level);
+      transport.notify(localizeAetherUiText(message, latestHostContext), level);
     },
   };
 }

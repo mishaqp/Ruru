@@ -66,7 +66,7 @@ test('R06: an unresolved renderer reports a timeout and releases the UI queue', 
   const id = loaded.snapshot.extensions[0].id;
   const stalled = await request('get_aether_extensions', { context: { hang: true } });
   assert.match(JSON.stringify(stalled.snapshot.errors), /timed out/i);
-  const healthy = await request('invoke_aether_action', { extension_id: id, action: 'healthy' });
+  const healthy = await request('invoke_aether_extension_action', { extension_id: id, action: 'healthy' });
   assert.equal(healthy.result.healthy, true);
 });
 
@@ -78,9 +78,9 @@ test('R06: timed-out action cannot write late data through captured API methods'
   };`);
   const loaded = await request('reload_aether_extensions');
   const id = loaded.snapshot.extensions[0].id;
-  await assert.rejects(request('invoke_aether_action', { extension_id: id, action: 'late' }), /timed out/i);
+  await assert.rejects(request('invoke_aether_extension_action', { extension_id: id, action: 'late' }), /timed out/i);
   await delay(320);
-  const read = await request('invoke_aether_action', { extension_id: id, action: 'read' });
+  const read = await request('invoke_aether_extension_action', { extension_id: id, action: 'read' });
   assert.equal(read.result.late, false);
 });
 
@@ -90,7 +90,7 @@ test('R06: hanging event does not starve subsequent healthy event handlers', asy
     api.on('probe', () => ({ payload: { healthy: true } }));
   };`);
   await request('reload_aether_extensions');
-  const result = await request('dispatch_aether_event', { event: 'probe' });
+  const result = await request('dispatch_aether_extension_event', { event: 'probe' });
   assert.equal(result.payload.healthy, true);
   assert.match(JSON.stringify(result.snapshot.errors), /timed out/i);
 });
@@ -104,7 +104,7 @@ test('R06: hanging cleanup is diagnosed without blocking the replacement runtime
   const loaded = await request('reload_aether_extensions');
   assert.equal(loaded.reloaded, true);
   assert.match(JSON.stringify(loaded.errors), /timed out/i);
-  const result = await request('invoke_aether_action', { extension_id: loaded.snapshot.extensions[0].id, action: 'healthy' });
+  const result = await request('invoke_aether_extension_action', { extension_id: loaded.snapshot.extensions[0].id, action: 'healthy' });
   assert.equal(result.result.healthy, true);
 });
 
@@ -115,9 +115,9 @@ test('R06: successful detached callbacks remain supported', async t => {
   };`);
   const loaded = await request('reload_aether_extensions');
   const id = loaded.snapshot.extensions[0].id;
-  await request('invoke_aether_action', { extension_id: id, action: 'schedule' });
+  await request('invoke_aether_extension_action', { extension_id: id, action: 'schedule' });
   await delay(170);
-  const read = await request('invoke_aether_action', { extension_id: id, action: 'read' });
+  const read = await request('invoke_aether_extension_action', { extension_id: id, action: 'read' });
   assert.equal(read.result.late, true);
 });
 

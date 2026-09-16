@@ -384,6 +384,17 @@ const RU_EXTRA_TEXT: Readonly<Record<string, string>> = {
 
   // Web Access additions.
   "Pick a specific provider above to configure its API key, base URL, and provider-specific options.": "Выберите конкретного провайдера выше, чтобы настроить его API-ключ, базовый URL и специальные параметры.",
+  "Optional Responses-compatible endpoint override. Empty uses the default endpoint.": "Необязательная конечная точка, совместимая с Responses. Пустое значение использует адрес по умолчанию.",
+  "Optional endpoint override. Empty uses the default endpoint.": "Необязательная конечная точка. Пустое значение использует адрес по умолчанию.",
+  "Optional gateway override; search and extract requests are routed there. Empty uses the default endpoint.": "Необязательный шлюз; через него направляются запросы поиска и извлечения. Пустое значение использует адрес по умолчанию.",
+  "Optional gateway override; search and fetch requests are routed there. Empty uses the default endpoint.": "Необязательный шлюз; через него направляются запросы поиска и загрузки. Пустое значение использует адрес по умолчанию.",
+  "Optional gateway override; search and fetch requests are routed there. Empty uses the default endpoints.": "Необязательный шлюз; через него направляются запросы поиска и загрузки. Пустое значение использует адреса по умолчанию.",
+  "Optional gateway override; search and crawl requests are routed there. Empty uses the default endpoint.": "Необязательный шлюз; через него направляются запросы поиска и обхода страниц. Пустое значение использует адрес по умолчанию.",
+  "Optional gateway override; search and contents requests are routed there. Empty uses the default endpoint.": "Необязательный шлюз; через него направляются запросы поиска и получения содержимого. Пустое значение использует адрес по умолчанию.",
+  "Optional gateway override for the direct answer and search APIs; the zero-config Exa MCP tool is not affected. Empty uses the default endpoint.": "Необязательный шлюз для API прямых ответов и поиска; MCP-инструмент Exa без настройки не затрагивается. Пустое значение использует адрес по умолчанию.",
+  "Optional bare gateway URL without an API version suffix. Empty uses the default endpoint.": "Необязательный базовый URL шлюза без суффикса версии API. Пустое значение использует адрес по умолчанию.",
+  "Self-hosted SearXNG search instance. Search is routed here first when configured.": "Собственный экземпляр поиска SearXNG. После настройки поиск сначала направляется сюда.",
+  "Optional firewall-compatible Firecrawl server for blocked-content extraction.": "Необязательный сервер Firecrawl для извлечения заблокированного содержимого с учётом сетевых ограничений.",
 };
 
 const PRESENTATION_KEYS = new Set([

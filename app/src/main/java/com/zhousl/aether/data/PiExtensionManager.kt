@@ -1,5 +1,13 @@
 package com.zhousl.aether.data
 
+import kotlinx.serialization.json.jsonObject
+
+import kotlinx.serialization.json.Json
+
+import kotlinx.coroutines.CancellationException
+
+import com.zhousl.aether.data.pi.removeExtensionWithReload
+
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -458,31 +466,42 @@ class PiExtensionManager(
         }
     }
 
-    suspend fun remove(extension: InstalledPiExtension): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            stateRepository.setEnabled(extension.id, enabled = true)
-            when (extension.kind) {
-                PiExtensionInstallKind.Package -> {
-                    val response = piKernelBridge.removeExtensionPackage(
-                        extension.source,
-                        stateRepository.loadOptions(),
-                    )
-                    require(response.optBoolean("removed")) {
-                        "No installed Pi extension matched ${extension.source}."
-                    }
-                    requireExtensionReloadSucceeded(
-                        piKernelBridge.reloadAllExtensions(stateRepository.loadOptions())
-                    )
-                }
-
-                PiExtensionInstallKind.Imported -> {
-                    removeImportedExtension(extension.installedPath)
-                    requireExtensionReloadSucceeded(
-                        piKernelBridge.reloadAllExtensions(stateRepository.loadOptions())
-                    )
-                }
+    suspend fun remove(extension: InstalledPiExtension): Result<Unit> =
+        removeWithStatus(extension).mapCatching { response ->
+            require(response.optBoolean("ok")) {
+                response.optString("errmsg").ifBlank { "Extension removal could not be applied." }
             }
             Unit
+        }
+
+    /** Detailed management result; UI callers retain the Result<Unit> wrapper. */
+    suspend fun removeWithStatus(extension: InstalledPiExtension): Result<JSONObject> = withContext(Dispatchers.IO) {
+        runCatching {
+            val response = removeExtensionWithReload(
+                source = extension.source.ifBlank { extension.id },
+                remove = {
+                    val removed = when (extension.kind) {
+                        PiExtensionInstallKind.Package -> piKernelBridge.removeExtensionPackage(
+                            extension.source,
+                            stateRepository.loadOptions(),
+                        )
+                        PiExtensionInstallKind.Imported -> {
+                            removeImportedExtension(extension.installedPath)
+                            JSONObject().put("removed", true)
+                        }
+                    }
+                    Json.parseToJsonElement(removed.toString()).jsonObject
+                },
+                onRemoved = { stateRepository.setEnabled(extension.id, enabled = true) },
+                reload = {
+                    Json.parseToJsonElement(
+                        piKernelBridge.reloadAllExtensions(stateRepository.loadOptions()).toString(),
+                    ).jsonObject
+                },
+            )
+            JSONObject(response.toString())
+        }.onFailure { failure ->
+            if (failure is CancellationException) throw failure
         }
     }
 

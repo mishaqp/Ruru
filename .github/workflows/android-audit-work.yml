@@ -1,0 +1,66 @@
+name: Android audit regression work
+on:
+  push:
+    branches: ['fix/android-only-audit-followup']
+permissions:
+  contents: read
+concurrency:
+  group: android-audit-work
+  cancel-in-progress: true
+jobs:
+  reproduce_android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: enhanced
+          cache-read-only: false
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+      - name: Extract unchanged Android queue construction
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/com/zhousl/aether/data/pi/PiKernelBridge.kt')
+          s=p.read_text()
+          old='Channel<PiBridgeFrame>(Channel.UNLIMITED)'
+          assert s.count(old)==1
+          p.write_text(s.replace(old,'newPiBridgeEventChannel<PiBridgeFrame>()'))
+          PY
+      - name: Verify R08 and R11 regression failures
+        shell: bash
+        run: |
+          chmod +x ./gradlew
+          set +e
+          ./gradlew :app:testDebugUnitTest --tests '*PiBridgeEventQueueTest' --tests '*ExtensionRemovalReportTest' --stacktrace > android-red.log 2>&1
+          status=$?
+          set -e
+          tail -n 90 android-red.log
+          test "$status" -ne 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          files=list(Path('app/build/test-results/testDebugUnitTest').glob('TEST-*ReportTest.xml'))+list(Path('app/build/test-results/testDebugUnitTest').glob('TEST-*EventQueueTest.xml'))
+          assert len(files)==2, 'Tests must compile and execute, not fail during build'
+          failures=sum(int(ET.parse(f).getroot().get('failures','0')) for f in files)
+          assert failures==6, f'Expected six specific regressions, got {failures}'
+          print('R08/R11 RED confirmed: six regression failures, two happy paths PASS')
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: android-audit-red
+          path: |
+            android-red.log
+            app/build/test-results/testDebugUnitTest/**
+          retention-days: 7

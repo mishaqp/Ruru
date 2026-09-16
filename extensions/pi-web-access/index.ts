@@ -1,3 +1,4 @@
+import type { CompletionHeaders } from "./provider-headers.ts";
 import type { AgentToolResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Box, Text, truncateToWidth, type KeyId } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
@@ -1006,7 +1007,7 @@ export default function (pi: ExtensionAPI) {
 	async function resolveFirstAvailableModel(
 		ctx: SummaryGenerationContext,
 		candidates: Array<{ provider: string; id: string }>,
-	): Promise<{ model: Model<Api>; apiKey: string; headers?: Record<string, string> }> {
+	): Promise<{ model: Model<Api>; apiKey: string; headers?: CompletionHeaders }> {
 		const enabledModelPatterns = loadEnabledModelPatterns(ctx);
 		for (const { provider, id } of candidates) {
 			const model = findModelWithProviderRouting(ctx.modelRegistry, provider, id);

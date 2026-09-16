@@ -8,6 +8,8 @@ export type AetherView =
   | undefined;
 
 export type AetherRenderContext = AetherJsonObject & {
+  /** Cooperative cancellation when this extension instance is revoked. */
+  signal?: AbortSignal;
   extension: {
     id: string;
     name: string;
@@ -246,6 +248,8 @@ export interface AetherUi {
 
 export interface AetherExtensionAPI {
   readonly apiVersion: 2;
+  /** Aborted on callback timeout or instance disposal. Optional for older hosts. */
+  readonly signal?: AbortSignal;
   readonly extension: {
     id: string;
     name: string;

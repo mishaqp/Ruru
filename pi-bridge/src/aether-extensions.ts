@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { ExtensionExecution, guardExtensionApi } from "./extension-execution.js";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -71,6 +72,7 @@ interface DiscoveredAetherEntry {
 }
 
 interface LoadedAetherExtension extends AetherExtensionDescriptor {
+  execution: ExtensionExecution;
   cleanup?: () => void | Promise<void>;
 }
 
@@ -701,6 +703,7 @@ function createApiEventRegistration(
 function createRenderContext(extension: LoadedAetherExtension): AetherRenderContext {
   return {
     ...cloneJson(latestHostContext),
+    signal: extension.execution.signal,
     extension: {
       id: extension.id,
       name: extension.name,
@@ -715,10 +718,11 @@ function createApi(
   extension: LoadedAetherExtension,
 ): AetherExtensionAPI {
   const invalidate = () => {
-    if (runtime === runtimeState) bumpVersion();
+    if (runtime === runtimeState && extension.execution.active) bumpVersion();
   };
-  return {
+  const api: AetherExtensionAPI = {
     apiVersion: AETHER_API_VERSION,
+    signal: extension.execution.signal,
     extension: {
       id: extension.id,
       name: extension.name,
@@ -1039,6 +1043,7 @@ function createApi(
       transport.notify(localizeAetherUiText(message, latestHostContext), level);
     },
   };
+  return guardExtensionApi(api, extension.execution);
 }
 
 async function loadFactory(
@@ -1071,9 +1076,10 @@ async function cleanupRuntime(
 ): Promise<void> {
   for (const extension of [...previous.extensions].reverse()) {
     if (preservedExtensions.has(extension)) continue;
+    extension.execution.revoke();
     if (!extension.cleanup) continue;
     try {
-      await extension.cleanup();
+      await extension.execution.run("cleanup", () => extension.cleanup?.());
     } catch (error) {
       recordRuntimeError(errorTarget, {
         path: extension.path,
@@ -1182,7 +1188,7 @@ async function loadAetherAppExtensionsUnlocked(
   const preservedExtensions = new Set<LoadedAetherExtension>();
   let successfulLoads = 0;
   for (const descriptor of descriptors) {
-    const extension: LoadedAetherExtension = { ...descriptor };
+    const extension: LoadedAetherExtension = { ...descriptor, execution: new ExtensionExecution(descriptor.id) };
     try {
       const packageRoot = packageRootForExtensionPath(descriptor.path, AETHER_EXTENSION_ROOT);
       if (packageRoot && !installedDependencyRoots.has(packageRoot)) {
@@ -1192,13 +1198,17 @@ async function loadAetherAppExtensionsUnlocked(
       if (descriptor.compatibilityError) {
         throw new Error(descriptor.compatibilityError);
       }
-      const factory = await loadFactory(descriptor);
-      if (!factory) continue;
-      const cleanup = await factory(createApi(candidate, extension));
+      const factory = await extension.execution.run("load", () => loadFactory(descriptor));
+      if (!factory) {
+        extension.execution.revoke();
+        continue;
+      }
+      const cleanup = await extension.execution.run("load", () => factory(createApi(candidate, extension)));
       if (typeof cleanup === "function") extension.cleanup = cleanup;
       candidate.extensions.push(extension);
       successfulLoads += 1;
     } catch (error) {
+      extension.execution.revoke();
       removeExtensionRegistrations(candidate, extension);
       recordRuntimeError(candidate, {
         path: descriptor.path,
@@ -1257,7 +1267,7 @@ async function renderRegisteredView(
 ): Promise<AetherView> {
   try {
     const value = typeof render === "function"
-      ? await render(createRenderContext(extension))
+      ? await extension.execution.run("render", () => render(createRenderContext(extension)))
       : render;
     return cloneJson(value);
   } catch (error) {
@@ -1288,10 +1298,10 @@ async function renderRegisteredMessage(
   try {
     const render = registration.render;
     const value = typeof render === "function"
-      ? await render({
+      ? await registration.extension.execution.run("render", () => render({
         ...createRenderContext(registration.extension),
         message: { ...message, ...asObject(message.payload) },
-      })
+      }))
       : render;
     return cloneJson(value);
   } catch (error) {
@@ -1481,13 +1491,13 @@ async function invokeAetherAppExtensionActionUnlocked(
   const action = runtime.actions.get(id);
   if (!action) throw new Error(`Unknown Aether extension action: ${actionId}`);
   try {
-    const result = await action.handler(
+    const result = await action.extension.execution.run("action", () => action.handler(
       cloneJson(payload),
       {
         ...createRenderContext(action.extension),
         action: action.localId,
       },
-    );
+    ));
     bumpVersion();
     return {
       invoked: true,
@@ -1535,13 +1545,13 @@ async function dispatchAetherAppExtensionEventUnlocked(
   const results: unknown[] = [];
   for (const registration of handlers) {
     try {
-      const rawResult = await registration.handler(
+      const rawResult = await registration.extension.execution.run("event", () => registration.handler(
         cloneJson(chainedPayload),
         {
           ...createRenderContext(registration.extension),
           event: eventName,
         },
-      );
+      ));
       results.push(cloneJson(rawResult));
       const result = asObject(rawResult);
       if (result.cancel === true || result.cancelled === true) {

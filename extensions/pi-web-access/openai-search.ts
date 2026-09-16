@@ -1,3 +1,4 @@
+import { httpProviderHeaders } from "./provider-headers.ts";
 import { existsSync, readFileSync } from "node:fs";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { activityMonitor } from "./activity.ts";
@@ -172,7 +173,7 @@ async function resolvePiAuth(ctx: ExtensionContext, responsesUrl: string, modelO
 					provider,
 					apiKey: resolved.apiKey,
 					model: modelOverride ?? preferred.id,
-					headers: resolved.headers ?? {},
+					headers: httpProviderHeaders(resolved.headers),
 					responsesUrl,
 				};
 			}

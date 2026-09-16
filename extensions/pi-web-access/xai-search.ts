@@ -1,3 +1,4 @@
+import { httpProviderHeaders } from "./provider-headers.ts";
 import { existsSync, readFileSync } from "node:fs";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { activityMonitor } from "./activity.ts";
@@ -86,7 +87,7 @@ async function resolvePiAuth(ctx: ExtensionContext, modelOverride?: string): Pro
 			if (!model) continue;
 			const resolved = await ctx.modelRegistry.getApiKeyAndHeaders(model);
 			if (resolved.ok && resolved.apiKey) {
-				return { apiKey: resolved.apiKey, model: modelOverride ?? modelId, headers: resolved.headers ?? {} };
+				return { apiKey: resolved.apiKey, model: modelOverride ?? modelId, headers: httpProviderHeaders(resolved.headers) };
 			}
 		} catch {
 		}

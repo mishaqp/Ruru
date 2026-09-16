@@ -10,7 +10,14 @@
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "@baimoqilin/aether-extension-api": [
+        "../../packages/extension-api/dist/index.d.ts"
+      ]
+    }
   },
-  "include": ["*.ts"]
+  "include": [
+    "*.ts"
+  ]
 }

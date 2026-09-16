@@ -1,0 +1,41 @@
+name: Bundled extension typechecks
+on:
+  pull_request:
+  push:
+    branches: ['main']
+    paths:
+      - 'extensions/**'
+      - 'packages/extension-api/**'
+      - 'pi-bridge/package.json'
+      - 'scripts/check-bundled-extensions.mjs'
+      - '.github/workflows/extension-typecheck.yml'
+permissions:
+  contents: read
+concurrency:
+  group: bundled-extension-typecheck-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [pi-mcp-adapter, pi-subagents, pi-web-access]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check Node version
+        run: node --version
+      - name: Check canonical SDK, package sources and negative coverage probe
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: node scripts/check-bundled-extensions.mjs "$PACKAGE" 2>&1 | tee extension-typecheck.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: extension-typecheck-${{ matrix.package }}
+          path: extension-typecheck.log
+          retention-days: 14

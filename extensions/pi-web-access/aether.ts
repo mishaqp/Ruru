@@ -2,15 +2,16 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname } from "node:path";
 import { getWebSearchConfigPath } from "./utils.ts";
 
+// Type-only: both loaders share the host contract without runtime imports.
 import type {
   AetherJsonObject,
   AetherView,
   AetherRenderContext,
   AetherSettingDefinition,
   AetherSettingsSection,
-  AetherExtensionAPI,
   AetherSettingsCategory,
   AetherMessageTypeDefinition,
+  AetherExtensionAPI,
 } from "@baimoqilin/aether-extension-api";
 
 const SETTINGS_PAGE_ID = "web-access-settings";

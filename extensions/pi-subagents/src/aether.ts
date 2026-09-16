@@ -24,14 +24,15 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
+// Type-only: both loaders share the host contract without runtime imports.
 import type {
   AetherJsonObject,
   AetherView,
   AetherRenderContext,
   AetherSettingDefinition,
   AetherSettingsSection,
-  AetherExtensionAPI,
   AetherMessageTypeDefinition,
+  AetherExtensionAPI,
 } from "@baimoqilin/aether-extension-api";
 
 // ---- Bridge to the Pi extension -------------------------------------------

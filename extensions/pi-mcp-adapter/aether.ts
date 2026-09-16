@@ -10,28 +10,30 @@ import {
   type McpAetherSnapshot,
 } from "./aether-bridge.ts";
 
+// Type-only: both loaders share the host contract without runtime imports.
 import type {
   AetherJsonObject,
   AetherView,
   AetherRenderContext,
-  AetherSettingDefinition,
-  AetherSettingsSection,
-  AetherExtensionAPI,
   AetherSettingOption,
   AetherSettingActionItem,
   AetherSettingDetailItem,
+  AetherSettingDefinition,
+  AetherSettingsSection,
   AetherSettingsCategory,
   AetherSettingsDefinition,
+  AetherExtensionAPI,
 } from "@baimoqilin/aether-extension-api";
+
 export type {
-  AetherSettingDefinition,
-  AetherExtensionAPI,
   AetherSettingOption,
   AetherSettingActionItem,
   AetherSettingDetailItem,
+  AetherSettingDefinition,
+  AetherSettingsSection,
   AetherSettingsCategory,
   AetherSettingsDefinition,
-  AetherSettingsSection,
+  AetherExtensionAPI,
 } from "@baimoqilin/aether-extension-api";
 
 const PAGE_ID = "mcp-settings";

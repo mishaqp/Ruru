@@ -25,8 +25,6 @@
     "@lobehub/icons-static-png": "^1.91.0",
     "@types/node": "24.12.4",
     "esbuild": "0.27.2",
-    "typescript": "5.9.3",
-    "@types/cross-spawn": "6.0.6",
-    "@types/turndown": "5.0.6"
+    "typescript": "5.9.3"
   }
 }

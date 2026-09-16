@@ -74,6 +74,7 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
     assert.ok(ui.snapshot.settings.length >= 3);
     const ruSnapshot = JSON.stringify(ui.snapshot);
     assert.match(ruSnapshot, /Веб-доступ/);
+    assert.match(ruSnapshot, /Все доступные провайдеры/);
     assert.match(ruSnapshot, /MCP-серверы/);
     assert.match(ruSnapshot, /Субагенты/);
     assert.match(ruSnapshot, /Добавить MCP-сервер/);
@@ -83,6 +84,7 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
     assert.match(ruSnapshot, /Конфиденциальность и сеть/);
     assert.match(ruSnapshot, /Исходные результаты/);
     assert.doesNotMatch(ruSnapshot, /"Web Access"/);
+    assert.doesNotMatch(ruSnapshot, /"All eligible providers"/);
     assert.doesNotMatch(ruSnapshot, /"MCP Servers"/);
     assert.doesNotMatch(ruSnapshot, /"Add MCP server"/);
     assert.doesNotMatch(ruSnapshot, /"Subagent Types"/);
@@ -95,6 +97,7 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
     const enUi = await request("reload_aether_extensions", { context: { platform: "android", language: "en" } });
     const enSnapshot = JSON.stringify(enUi.snapshot);
     assert.match(enSnapshot, /Web Access/);
+    assert.match(enSnapshot, /All eligible providers/);
     assert.match(enSnapshot, /MCP Servers/);
     assert.match(enSnapshot, /Subagents/);
     assert.match(enSnapshot, /Add MCP server/);

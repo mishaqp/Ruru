@@ -1,86 +1,62 @@
-# Runtime boundary fixes — 2026-09-16
+# Runtime boundaries: R06/R08 — 2026-09-16
 
-Base: `bb464252cf62f0f5d79dfe0e42378db2da457e5f` (PRs #10 and #11 already merged).
-This change addresses the remaining independent-audit findings R06, R08 and R11.
-No Nightly build or Nightly workflow change is required. Application ID, signing,
-provider/model/tool identifiers and saved chat formats are unchanged.
+Integrated base: `e76a9e8e9966c3dd387f72ede2c9c96e73043450`.
+PRs #10/#11/#12/#13 are preserved byte-for-byte except for the R06/R08 files
+listed below. The independently merged R11 deletion contract in #13 is retained;
+the competing low-level removal implementation and its tests were removed.
+No Nightly, signing, application ID or chat storage changes.
 
-## R06 — asynchronous extension handlers cannot hold the queue indefinitely
+## R06 — asynchronous extension waits
 
-The existing serialized runtime is retained; removing its lock would introduce
-registration/snapshot races. Load/render/action/event/cleanup waits receive phase
-budgets: render 10 s, action 120 s, event 30 s, cleanup 5 s, load 120 s. Timeouts are
-recorded by the existing per-extension error boundaries. A failed event does not
-prevent later event handlers; a failed cleanup does not block the next extension.
+The existing serialized runtime remains in place. Load/render/action/event/cleanup
+waits receive phase budgets: render 10 s, action 120 s, event 30 s, cleanup 5 s,
+load 120 s. Existing error boundaries record a timeout and continue; one hanging
+cleanup or event handler no longer indefinitely starves the later handlers.
 
-An AsyncLocalStorage scope follows each operation. Calls through the provided
-extension API are guarded at invocation time, including destructured methods and
-registration disposers. A timed-out continuation cannot subsequently call that
-API to mutate storage or register UI. Successful detached callbacks remain valid.
+An AsyncLocalStorage scope follows the operation. Calls through the extension API
+are checked at invocation time, including destructured methods and registration
+disposers. A timed-out continuation is rejected when it subsequently calls that
+API. Successful detached callbacks remain supported.
 
-**Limitations:** this is not a sandbox or full hot-unload. A deadline cannot
-preempt a synchronous infinite JS loop, undo raw filesystem/process effects, or
-cancel a host request already started by an extension. Arbitrary external timers
-and third-party side effects still require extension-owned cleanup. The global
-queue still serializes healthy handlers; this change bounds waits rather than
-redesigning the runtime or isolating each extension in a worker.
+This is a reliability boundary, **not a sandbox**. It cannot preempt synchronous
+infinite JS, undo arbitrary raw filesystem/process effects or cancel host calls
+already in flight. Extensions still own external timers, callbacks and cleanup.
+The lock remains serialized for healthy operations: this is not a worker-based
+runtime redesign or full hot-unload.
 
-## R08 — bounded Android bridge event queues
+## R08 — Android event buffering
 
-Each request buffers at most 1,024 events. FIFO order is preserved while capacity
-is available. The stdout reader uses non-blocking trySend: suspending that reader
-could deadlock a handler waiting for another response on the same bridge.
+Per-request FIFO channels are limited to 1,024 events. The shared stdout reader
+must never block: a handler can be waiting on another RPC carried by that reader.
+Overflow reports `event_queue_overflow` rather than silently dropping results or
+conflating tool events. Local queue/consumer resources are cancelled; cancellable
+requests receive an exact-request abort, subscriptions receive unsubscribe.
+Remote cleanup cannot start a Node process or target another process generation.
 
-Overflow is an explicit `event_queue_overflow` failure, not silent DROP_OLDEST or
-conflation of tool results. The failed request clears its local queue and cancels
-its event consumer. For cancellable turns it sends an abort targeted only at that
-request ID; subscription overflow sends unsubscribe. Cleanup cannot start a new
-Node process or target a different process generation. The original failure is
-retained if remote cleanup also fails.
+The limit bounds the **number** of events, not one frame's byte size. Normal
+stream bursts, UI responsiveness and peak RAM need a physical-device stress test.
 
-This bounds event **count**, not the byte size of a single frame. Normal burst
-size and device memory behaviour still require on-device stress testing.
+## TDD evidence
 
-## R11 — deletion and reload are separate, observable outcomes
+GitHub run 35076165051 reproduced four deadline failures before implementation;
+the successful detached-callback test passed. Run 35076578645 passed those cases
+after the implementation (its separate removal tests were later superseded by
+PR #13). The final `runtime-boundaries.test.mjs` retains the five R06 cases.
 
-Both bridge bundles now return the same additive fields:
+GitHub run 35076769260 compiled Android successfully, then failed the capacity
+test as expected with the old unbounded channel. FIFO passed. Permanent unit
+tests now also distinguish an overflowing channel from a closed channel.
 
-- `removed` and `removed_from_disk`: package deletion outcome;
-- `reload_status`: `not_found`, `applied`, `deferred`, `partial`, or `failed`;
-- `reload_required`: further user/agent recovery is needed;
-- `effective_on_next_turn`: a busy session has a scheduled reload;
-- `reload`: detailed per-session and Aether runtime outcomes.
+Final verification comes from PR Check, runtime regression and bundled extension
+typecheck jobs on the final commit, not from this document. No on-device or paid
+provider testing is claimed.
 
-The main bridge coordinates reload. Android's package manager no longer reloads
-again after deletion, while the Android agent preserves the structured result.
-The existing shared direct bridge consumer receives that same result. The UI
-keeps its Result<Unit> wrapper. Imported-directory deletion retains its own path.
+## Files and rollback
 
-A successful disk deletion is not hidden by a later reload exception. A busy
-session is not killed halfway through a tool call: its existing safe deferred
-reload/recreation boundary is retained. No guessed `active:false` or promise of
-immediate module unloading is returned.
+- `pi-bridge/src/extension-operation.ts`: timeout scopes/API guards.
+- `pi-bridge/src/aether-extensions.ts`: boundaries at load/render/action/event/cleanup.
+- `app/.../PiBridgeEventQueue.kt`: bounded FIFO and explicit overflow code.
+- `app/.../PiKernelBridge.kt`: queue integration and targeted overflow cleanup.
+- Tests: `runtime-boundaries.test.mjs`, `PiBridgeEventQueueTest.kt`.
 
-## Regression evidence
-
-The initial boundary run on GitHub (35076165051) produced six expected failures
-and one pass. It reproduced hanging render/action/event/cleanup operations and
-missing removal state in both bundles; successful detached callbacks passed.
-After R06/R11 integration the same seven tests passed (35076578645).
-
-The Android queue reproduction (35076769260) compiled successfully, then failed
-`slowConsumerCannotAccumulateUnboundedEvents`; its FIFO test passed. The final
-suite retains these cases and distinguishes overflow from a closed queue.
-
-Permanent tests also cover reload failure after deletion, partial Aether reload,
-absent packages, and a real busy Pi session against a local HTTP model fixture.
-No paid model API, real OAuth server or user's filesystem is used by those tests.
-
-Final CI status must be read from the pull request checks; this document is not a
-claim that the current APK was tested on a physical phone.
-
-## Rollback
-
-Revert this change as one unit: kernel reload ownership and the Android consumer
-must roll back together, otherwise duplicate or missing reloads would return.
-No persisted-data migration or signing change needs reversal.
+Revert the PR as a unit. There is no data migration or signing change to reverse.

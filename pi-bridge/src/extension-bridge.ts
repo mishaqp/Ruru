@@ -1,4 +1,3 @@
-import { finishExtensionRemoval } from "./extension-removal.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { flushCompileCache } from "node:module";
 import { createInterface } from "node:readline";
@@ -278,11 +277,12 @@ async function handleRequest(request: BridgeRequest): Promise<void> {
     case "remove_extension_package": {
       const source = asString(payload.source).trim();
       const removed = await removeExtensionPackage(process.cwd(), source);
-      const state = await finishExtensionRemoval(removed, async () => {
-        const result = await packageOperation(id, payload, async () => undefined, { removed });
-        return asObject(result.reload);
-      });
-      writeResponse(id, { ...state, source, ...(await installedPackagesPayload()) });
+      writeResponse(id, await packageOperation(
+        id,
+        payload,
+        async () => undefined,
+        { removed },
+      ));
       return;
     }
     case "update_extension_package":

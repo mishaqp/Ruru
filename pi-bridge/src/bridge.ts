@@ -1,4 +1,3 @@
-import { finishExtensionRemoval } from "./extension-removal.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { flushCompileCache } from "node:module";
 import * as fs from "node:fs/promises";
@@ -3252,9 +3251,8 @@ async function installExtensionPackage(payload: JsonObject): Promise<JsonObject>
 async function removeExtensionPackage(payload: JsonObject): Promise<JsonObject> {
   const source = asString(payload.source).trim();
   const removed = await removeAetherExtensionPackage(process.cwd(), source);
-  const state = await finishExtensionRemoval(removed, () => reloadAllExtensionSessions(payload));
   return {
-    ...state,
+    removed,
     source,
     ...(await installedExtensionPackagesPayload()),
   };

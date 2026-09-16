@@ -7,17 +7,15 @@ import { createInterface } from 'node:readline';
 import { setTimeout as delay } from 'node:timers/promises';
 import { test } from 'node:test';
 
-async function fixture(t, code, { managed = false, bundle = 'bridge.mjs' } = {}) {
+async function fixture(t, code) {
   const home = await mkdtemp(join(tmpdir(), 'ruru-boundary-'));
-  const agent = join(home, '.pi', 'agent');
-  const root = managed ? join(agent, 'npm', 'node_modules', 'boundary-test') : join(home, '.aether', 'extensions', 'boundary-test');
+  const root = join(home, '.aether', 'extensions', 'boundary-test');
   await mkdir(root, { recursive: true });
   await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'boundary-test', version: '1.0.0', aether: { api: { min: 2, max: 2 }, extensions: ['./aether.js'] } }));
   await writeFile(join(root, 'aether.js'), code);
-  if (managed) await writeFile(join(agent, 'settings.json'), JSON.stringify({ packages: ['npm:boundary-test'] }));
-  const child = spawn(process.execPath, [resolve('dist', bundle)], {
+  const child = spawn(process.execPath, [resolve('dist/bridge.mjs')], {
     cwd: home,
-    env: { ...process.env, HOME: home, USERPROFILE: home, PI_CODING_AGENT_DIR: agent, PI_OFFLINE: '1', NODE_ENV: 'test', RURU_EXTENSION_TEST_TIMEOUT_MS: '60' },
+    env: { ...process.env, HOME: home, USERPROFILE: home, PI_CODING_AGENT_DIR: join(home, '.pi', 'agent'), PI_OFFLINE: '1', NODE_ENV: 'test', RURU_EXTENSION_TEST_TIMEOUT_MS: '60' },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   let next = 0;
@@ -54,14 +52,11 @@ async function fixture(t, code, { managed = false, bundle = 'bridge.mjs' } = {})
   return { request, root };
 }
 
-const baseCode = `export default api => {
-  api.registerAction('healthy', () => ({ healthy: true }));
-  api.registerAction('read', () => ({ late: api.storage.get('late', false) }));
-  api.registerSurface('app.test', { id: 'test', render: context => context.hang ? new Promise(() => {}) : { type: 'text', text: 'Healthy' } });
-};`;
-
 test('R06: an unresolved renderer reports a timeout and releases the UI queue', async t => {
-  const { request } = await fixture(t, baseCode);
+  const { request } = await fixture(t, `export default api => {
+    api.registerAction('healthy', () => ({ healthy: true }));
+    api.registerSurface('app.test', { id: 'test', render: context => context.hang ? new Promise(() => {}) : { type: 'text', text: 'Healthy' } });
+  };`);
   const loaded = await request('reload_aether_extensions');
   const id = loaded.snapshot.extensions[0].id;
   const stalled = await request('get_aether_extensions', { context: { hang: true } });
@@ -120,20 +115,3 @@ test('R06: successful detached callbacks remain supported', async t => {
   const read = await request('invoke_aether_extension_action', { extension_id: id, action: 'read' });
   assert.equal(read.result.late, true);
 });
-
-for (const bundle of ['bridge.mjs', 'extension-bridge.mjs']) {
-  test(`R11: ${bundle} removes installed UI code once and returns explicit reload state`, async t => {
-    const { request } = await fixture(t, baseCode, { managed: true, bundle });
-    const loaded = await request('reload_aether_extensions');
-    assert.equal(loaded.snapshot.extensions.length, 1);
-    const removed = await request('remove_extension_package', { source: 'npm:boundary-test' });
-    assert.equal(removed.removed, true);
-    assert.equal(removed.removed_from_disk, true);
-    assert.equal(removed.reload_status, 'applied');
-    assert.equal(removed.effective_on_next_turn, false);
-    assert.equal(removed.reload.succeeded, true);
-    assert.deepEqual(removed.packages, []);
-    const after = await request('get_aether_extensions');
-    assert.equal(after.snapshot.extensions.length, 0);
-  });
-}

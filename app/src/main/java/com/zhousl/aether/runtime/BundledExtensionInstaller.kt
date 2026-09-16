@@ -18,8 +18,9 @@ internal enum class BundleInstallResult {
 
 /**
  * Upgrades only unchanged, identifiable bundled sources. User imports, edits,
- * extra files and dependency trees are never silently overwritten. Staging and
- * the recovery backup are outside the extension discovery directory.
+ * extra files and dependency trees are never silently discarded. A previously
+ * unmanaged npm lock is archived when the bundle first supplies a managed lock.
+ * Staging and all backups are outside the extension discovery directory.
  */
 internal class BundledExtensionInstaller(
     private val extensionRoot: File,
@@ -75,11 +76,14 @@ internal class BundledExtensionInstaller(
                 if (!exists(manifest)) writeManifest(target, next)
                 return BundleInstallResult.Unchanged
             }
-            if (!copyExtras(target, stage, previous.keys, next.keys)) {
+            val verifiedPrevious = previous.toMutableMap()
+            if (!copyExtras(target, stage, previous.keys, next.keys, verifiedPrevious)) {
                 return BundleInstallResult.PreservedLocalChanges
             }
             writeManifest(stage, next)
-            if (!matches(target, previous)) return BundleInstallResult.PreservedLocalChanges
+            // Includes any archived local lock, so a concurrent edit cannot be
+            // silently replaced with only an older backup of that file.
+            if (!matches(target, verifiedPrevious)) return BundleInstallResult.PreservedLocalChanges
             check(!exists(backup)) { "An unresolved bundled extension backup exists." }
             check(target.renameTo(backup)) { "Unable to back up bundled extension $name." }
             try {
@@ -126,6 +130,7 @@ internal class BundledExtensionInstaller(
         destination: File,
         previous: Set<String>,
         next: Set<String>,
+        verifiedPrevious: MutableMap<String, String>,
         relative: String = "",
     ): Boolean {
         val directory = if (relative.isEmpty()) source else File(source, relative)
@@ -138,14 +143,44 @@ internal class BundledExtensionInstaller(
             val output = File(destination, path)
             if (entry.isDirectory) {
                 if (exists(output) && !output.isDirectory) return false
-                if (!copyExtras(source, destination, previous, next, path)) return false
+                if (!copyExtras(source, destination, previous, next, verifiedPrevious, path)) return false
             } else if (path !in previous) {
+                // npm install created this file on older installs. Only adopt it
+                // for a known unchanged bundle, and retain every original byte.
+                // Previously managed locks and all other collisions stay protected.
+                if (path == "package-lock.json" && path in next && entry.isFile && output.isFile) {
+                    verifiedPrevious[path] = archiveLegacyNpmLock(source.name, entry)
+                    continue
+                }
                 if (path in next || exists(output)) return false
-                check(output.parentFile.mkdirs() || output.parentFile.isDirectory)
+                val parent = checkNotNull(output.parentFile)
+                check(parent.mkdirs() || parent.isDirectory)
                 entry.copyTo(output)
             }
         }
         return true
+    }
+
+    private fun archiveLegacyNpmLock(packageName: String, source: File): String {
+        val digest = sha256(source)
+        val archive = File(stateRoot, "$packageName.npm-lock-$digest.json")
+        if (!exists(archive)) {
+            val temporary = Files.createTempFile(stateRoot.toPath(), "$packageName.npm-lock-", ".tmp").toFile()
+            try {
+                source.copyTo(temporary, overwrite = true)
+                check(sha256(temporary) == digest && sha256(source) == digest) {
+                    "The local npm lock changed while preparing its backup."
+                }
+                // No REPLACE_EXISTING: never overwrite an existing user backup.
+                Files.move(temporary.toPath(), archive.toPath())
+            } finally {
+                deleteTree(temporary)
+            }
+        }
+        check(!Files.isSymbolicLink(archive.toPath()) && archive.isFile && sha256(archive) == digest) {
+            "Unable to verify the archived local npm lock."
+        }
+        return digest
     }
 
     private fun matches(root: File, expected: Map<String, String>): Boolean =

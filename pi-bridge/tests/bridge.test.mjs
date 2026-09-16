@@ -233,7 +233,7 @@ test("keeps npm install output off both bridge protocol streams", async () => {
   }
 });
 
-test("removes extension packages and reports the runtime reload", async () => {
+test("removes extension packages without reloading their code", async () => {
   const home = await mkdtemp(join(tmpdir(), "aether-remove-package-"));
   const agentDirectory = join(home, ".pi", "agent");
   const packageDirectory = join(
@@ -273,9 +273,7 @@ test("removes extension packages and reports the runtime reload", async () => {
       source: "npm:aether-remove-test",
     });
     assert.equal(result.removed, true);
-    assert.equal(Object.hasOwn(result, "reload"), true);
-    assert.equal(result.removed_from_disk, true);
-    assert.equal(result.reload_status, "applied");
+    assert.equal(Object.hasOwn(result, "reload"), false);
     assert.deepEqual(result.packages, []);
   } finally {
     await client.close();

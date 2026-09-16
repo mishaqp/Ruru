@@ -729,11 +729,9 @@ class AetherSelfManagementTool(
                             it.kind == PiExtensionInstallKind.Package && it.source == source
                         }
                         ?: error("No installed extension package matched '$source'.")
-                    val payload = piExtensionManager.removeWithStatus(extension).getOrThrow()
-                    success(payload) {
-                        put("source", source)
-                        put("stdout", "Removed extension package '$source'. Runtime reload: ${payload.optString("reload_status")}. Inspect reload details; deferred code remains active until the current turn finishes.")
-                    }
+                    // Preserve removed=true even if the subsequent reload fails,
+                    // and expose scheduled application instead of claiming hot-unload.
+                    piExtensionManager.removeWithStatus(extension).getOrThrow().toString()
                 }
 
                 "reload" -> {
@@ -769,6 +767,7 @@ class AetherSelfManagementTool(
                 else -> failure("Unsupported Pi extension action '$action'.")
             }
         }.getOrElse { throwable ->
+            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
             failure(throwable.message ?: "Pi extension operation failed.")
         }
     }

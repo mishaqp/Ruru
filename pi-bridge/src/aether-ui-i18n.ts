@@ -233,6 +233,144 @@ const RU_TEXT: Readonly<Record<string, string>> = {
   "Read web content": "Веб-контент прочитан",
 };
 
+/**
+ * Presentation-only additions. These strings are rendered by bundled extension
+ * settings/cards/surfaces. They deliberately do not include tool ids, command
+ * names, provider/model ids, paths, URLs, persisted option values or schemas.
+ */
+const RU_EXTRA_TEXT: Readonly<Record<string, string>> = {
+  // Common live UI.
+  "Add server": "Добавить сервер",
+  "Authentication": "Аутентификация",
+  "Conversation": "Диалог",
+  "Name": "Имя",
+  "No conversation available.": "Диалог недоступен.",
+  "No conversation available yet.": "Диалог пока недоступен.",
+  "No output.": "Нет результата.",
+  "Result": "Результат",
+  "Status": "Статус",
+  "Stop": "Остановить",
+  "Stop agent": "Остановить агента",
+  "Subagent": "Субагент",
+  "Subagent activity": "Активность субагента",
+  "Subagent unavailable": "Субагент недоступен",
+  "View": "Открыть",
+
+  // Subagent tool-card titles.
+  "Running subagent": "Запуск субагента",
+  "Ran subagent": "Субагент завершён",
+  "Checking subagent result": "Проверка результата субагента",
+  "Checked subagent result": "Результат субагента проверен",
+  "Steering subagent": "Управление субагентом",
+  "Steered subagent": "Субагент направлен",
+
+  // MCP form and management UI.
+  "2026-07-28 only": "Только 2026-07-28",
+  "Bearer token": "Bearer-токен",
+  "Bearer token env var": "Переменная среды Bearer-токена",
+  "HTTP headers": "HTTP-заголовки",
+  "HTTP transport": "HTTP-транспорт",
+  "OAuth grant type": "Тип OAuth grant",
+  "OAuth client ID": "ID клиента OAuth",
+  "OAuth client secret": "Секрет клиента OAuth",
+  "OAuth scopes": "Области доступа OAuth",
+  "OAuth redirect URI": "URI перенаправления OAuth",
+  "OAuth client name": "Имя клиента OAuth",
+  "OAuth client URI": "URI клиента OAuth",
+  "OAuth logo URL": "URL логотипа OAuth",
+  "Skip OAuth issuer validation": "Пропустить проверку issuer OAuth",
+  "OAuth authorization params": "Параметры авторизации OAuth",
+  "Per-request headers command": "Команда заголовков для каждого запроса",
+  "Idle timeout (minutes)": "Тайм-аут простоя (минуты)",
+  "Request timeout (ms)": "Тайм-аут запроса (мс)",
+  "MCP protocol era": "Версия протокола MCP",
+  "Expose resources": "Показывать ресурсы",
+  "Direct tools": "Прямые инструменты",
+  "Custom direct tools": "Пользовательские прямые инструменты",
+  "Tool prefix": "Префикс инструментов",
+  "Include tools": "Включить инструменты",
+  "Exclude tools": "Исключить инструменты",
+  "Search keywords": "Ключевые слова поиска",
+  "Require approval": "Требовать подтверждение",
+  "Custom approval tools": "Инструменты с пользовательским подтверждением",
+  "Show stderr": "Показывать stderr",
+  "Protocol trace": "Трассировка протокола",
+  "Disabled": "Отключён",
+  "Rename to": "Переименовать в",
+  "Rename server": "Переименовать сервер",
+  "Authenticate (OAuth)": "Авторизоваться (OAuth)",
+  "Clear OAuth credentials": "Очистить данные OAuth",
+  "Remove server": "Удалить сервер",
+  "MCP OAuth": "MCP OAuth",
+  "Open authorization URL": "Открыть URL авторизации",
+  "Callback URL or authorization code": "Callback URL или код авторизации",
+  "Complete OAuth": "Завершить OAuth",
+
+  // MCP descriptions.
+  "Executable for the stdio transport, for example npx or uvx.": "Исполняемая команда для stdio-транспорта, например npx или uvx.",
+  "One argument per line. Environment interpolation is supported.": "Один аргумент на строку. Поддерживается подстановка переменных среды.",
+  "JSON object such as {\"API_KEY\": \"$ENV_VAR\"}. A value beginning with ! runs a command when the server connects.": "JSON-объект, например {\"API_KEY\": \"$ENV_VAR\"}. Значение, начинающееся с !, запускает команду при подключении сервера.",
+  "Optional. Supports ${VAR}, $env:VAR, and ~.": "Необязательно. Поддерживаются ${VAR}, $env:VAR и ~.",
+  "HTTP MCP endpoint. Supports Streamable HTTP and legacy SSE.": "HTTP endpoint MCP. Поддерживает Streamable HTTP и legacy SSE.",
+  "Force a transport or let the adapter auto-negotiate.": "Выберите транспорт принудительно или разрешите адаптеру определить его автоматически.",
+  "OAuth is auto-detected by default unless custom headers are configured.": "По умолчанию OAuth определяется автоматически, если не настроены пользовательские заголовки.",
+  "Optional static token. Supports ${VAR}, $env:VAR, and !command sources.": "Необязательный статический токен. Поддерживаются ${VAR}, $env:VAR и источники !command.",
+  "Optional environment variable containing the bearer token.": "Необязательная переменная среды с Bearer-токеном.",
+  "JSON object such as {\"Authorization\": \"Bearer ${TOKEN}\"}.": "JSON-объект, например {\"Authorization\": \"Bearer ${TOKEN}\"}.",
+  "Client credentials completes without opening a browser.": "Client credentials завершается без открытия браузера.",
+  "Optional pre-registered client ID. Dynamic registration is used when empty.": "Необязательный заранее зарегистрированный ID клиента. Если поле пустое, используется динамическая регистрация.",
+  "Optional confidential-client secret. A leading ! runs a command.": "Необязательный секрет confidential-client. Начальный ! запускает команду.",
+  "Space-separated scopes requested from the authorization server.": "Области доступа, запрашиваемые у сервера авторизации, через пробел.",
+  "Exact pre-registered localhost callback, including port and path.": "Точный заранее зарегистрированный localhost callback, включая порт и путь.",
+  "Client display name advertised during dynamic registration.": "Отображаемое имя клиента при динамической регистрации.",
+  "Client homepage advertised during dynamic registration.": "Домашняя страница клиента при динамической регистрации.",
+  "Absolute http(s) logo URL advertised during dynamic registration.": "Абсолютный http(s) URL логотипа при динамической регистрации.",
+  "Security-weakening escape hatch for known-misconfigured authorization servers.": "Ослабляющий проверку параметр для заведомо некорректно настроенных серверов авторизации.",
+  "Optional JSON object of extra authorization URL parameters.": "Необязательный JSON-объект дополнительных параметров URL авторизации.",
+  "Optional JSON object { \"command\": \"...\", \"args\": [...] }. Derives fail-closed headers for every HTTP request.": "Необязательный JSON-объект { \"command\": \"...\", \"args\": [...] }. Формирует fail-closed заголовки для каждого HTTP-запроса.",
+  "Explicit rmcp-mux Unix-domain socket. Supports ${VAR}, $env:VAR, and ~.": "Явный Unix-domain socket rmcp-mux. Поддерживаются ${VAR}, $env:VAR и ~.",
+  "When the server process or HTTP session is connected.": "Когда подключается процесс сервера или HTTP-сессия.",
+  "Minutes before idle disconnect. Empty uses the global setting, 0 disables idle timeout.": "Минуты до отключения при простое. Пустое значение использует общую настройку, 0 отключает тайм-аут простоя.",
+  "Milliseconds before live requests time out. Empty or 0 uses the SDK default.": "Миллисекунды до тайм-аута активного запроса. Пустое значение или 0 использует значение SDK по умолчанию.",
+  "Legacy is the default. Auto offers 2026-07-28 with legacy fallback.": "По умолчанию используется legacy. Auto предлагает 2026-07-28 с резервным legacy-режимом.",
+  "Expose MCP resources as callable tools.": "Предоставлять ресурсы MCP как вызываемые инструменты.",
+  "Register tools individually instead of routing through the mcp proxy tool.": "Регистрировать инструменты отдельно вместо маршрутизации через proxy-инструмент mcp.",
+  "Tool names, one per line or a JSON array. Used only when Custom is selected above.": "Имена инструментов: по одному на строку или JSON-массив. Используется только при выборе «Пользовательское» выше.",
+  "Prefix style for tools exposed by this server.": "Стиль префикса инструментов, предоставляемых этим сервером.",
+  "Optional tool names or glob patterns. Empty includes all tools.": "Необязательные имена инструментов или glob-шаблоны. Пустое значение включает все инструменты.",
+  "Optional tool names or glob patterns to hide after includeTools.": "Необязательные имена инструментов или glob-шаблоны, скрываемые после includeTools.",
+  "Optional JSON object such as {\"list_issues\": [\"github\", \"issues\"]}.": "Необязательный JSON-объект, например {\"list_issues\": [\"github\", \"issues\"]}.",
+  "Require interactive approval before calling matching tools.": "Требовать интерактивное подтверждение перед вызовом подходящих инструментов.",
+  "Show the server's stderr in the Pi session log.": "Показывать stderr сервера в журнале сессии Pi.",
+  "Enable metadata-only JSONL protocol tracing for this server.": "Включить для этого сервера трассировку протокола JSONL только с метаданными.",
+  "Keep this server configured but prevent connections and tool calls.": "Сохранить конфигурацию сервера, но запретить подключения и вызовы инструментов.",
+  "Runtime status reported by the Pi extension.": "Статус среды выполнения, сообщаемый расширением Pi.",
+  "This server is disabled.": "Этот сервер отключён.",
+  "Switching transport clears the previous transport-specific fields.": "Смена транспорта очищает поля, относящиеся к предыдущему транспорту.",
+  "Type the new name, then tap Rename server.": "Введите новое имя и нажмите «Переименовать сервер».",
+  "Rename this server and keep its configuration.": "Переименовать сервер, сохранив его конфигурацию.",
+  "Close and reconnect this server without reloading Pi.": "Закрыть соединение и переподключить сервер без перезагрузки Pi.",
+  "Start or continue the OAuth flow for this server.": "Начать или продолжить OAuth для этого сервера.",
+  "Remove stored OAuth credentials and close the connection.": "Удалить сохранённые данные OAuth и закрыть соединение.",
+  "Remove this server from the Pi MCP config.": "Удалить этот сервер из конфигурации Pi MCP.",
+  "Unique server name used as the config key and default tool prefix.": "Уникальное имя сервера, используемое как ключ конфигурации и префикс инструментов по умолчанию.",
+  "All transports supported by the MCP adapter.": "Все транспорты, поддерживаемые MCP-адаптером.",
+  "Write this server to the Pi MCP config, then reload to connect.": "Записать сервер в конфигурацию Pi MCP, затем перезагрузить для подключения.",
+  "Open the authorization URL, approve access, then paste the full callback URL or code back here.": "Откройте URL авторизации, разрешите доступ, затем вставьте сюда полный callback URL или код.",
+  "The browser may not be able to reach the localhost callback from another device; paste the redirect URL manually below.": "Браузер на другом устройстве может не открыть localhost callback; вставьте URL перенаправления вручную ниже.",
+  "Paste the full URL from the browser address bar after approving access.": "После разрешения доступа вставьте полный URL из адресной строки браузера.",
+  "Exchange the authorization code and reconnect the server.": "Обменять код авторизации и переподключить сервер.",
+
+  // MCP tool-card titles.
+  "Calling MCP": "Вызов MCP",
+  "Called MCP": "Вызов MCP завершён",
+  "Running MCP script": "Запуск MCP-скрипта",
+  "Ran MCP script": "MCP-скрипт завершён",
+
+  // Web Access additions.
+  "Pick a specific provider above to configure its API key, base URL, and provider-specific options.": "Выберите конкретного провайдера выше, чтобы настроить его API-ключ, базовый URL и специальные параметры.",
+};
+
 const PRESENTATION_KEYS = new Set([
   "title",
   "subtitle",
@@ -244,6 +382,10 @@ const PRESENTATION_KEYS = new Set([
   "buttonLabel",
   "running_title",
   "completed_title",
+  "pill",
+  "badge",
+  "tag",
+  "resultText",
 ]);
 
 function currentLanguage(hostContext: JsonRecord): string {
@@ -255,11 +397,144 @@ function currentLanguage(hostContext: JsonRecord): string {
   return direct || (typeof nested === "string" ? nested : "");
 }
 
+function russianPlural(count: number, one: string, few: string, many: string): string {
+  const value = Math.abs(Math.trunc(count));
+  const mod100 = value % 100;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  const mod10 = value % 10;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
+function translateStatus(status: string): string | undefined {
+  const normalized = status.toLowerCase();
+  const statuses: Readonly<Record<string, string>> = {
+    "ready": "готов",
+    "not initialized": "не инициализирован",
+    "not initialized yet": "ещё не инициализирован",
+    "connected": "подключён",
+    "failed": "ошибка",
+    "auth required": "требуется авторизация",
+    "needs auth": "требуется авторизация",
+    "needs-auth": "требуется авторизация",
+    "not connected": "не подключён",
+    "not-connected": "не подключён",
+    "running": "выполняется",
+    "queued": "в очереди",
+    "completed": "завершён",
+    "stopped": "остановлен",
+    "aborted": "прерван",
+    "steered": "направлен",
+    "error": "ошибка",
+    "enabled": "включён",
+    "disabled": "отключён",
+  };
+  return statuses[normalized];
+}
+
+function translateDynamicText(value: string): string | undefined {
+  let match: RegExpMatchArray | null;
+
+  match = value.match(/^([●▲○✓✗]\s*|🔑\s*)?(connected|failed|auth required|needs auth|needs-auth|not connected|not-connected|running|queued|completed|stopped|aborted|steered|error)$/i);
+  if (match) {
+    const translated = translateStatus(match[2]);
+    return translated ? `${match[1] ?? ""}${translated}` : undefined;
+  }
+
+  match = value.match(/^(\d+) tools$/);
+  if (match) {
+    const count = Number(match[1]);
+    return `${count} ${russianPlural(count, "инструмент", "инструмента", "инструментов")}`;
+  }
+  match = value.match(/^(\d+) tool uses$/);
+  if (match) {
+    const count = Number(match[1]);
+    return `${count} ${russianPlural(count, "вызов инструмента", "вызова инструмента", "вызовов инструментов")}`;
+  }
+  match = value.match(/^(\d+) turns$/);
+  if (match) {
+    const count = Number(match[1]);
+    return `${count} ${russianPlural(count, "ход", "хода", "ходов")}`;
+  }
+  match = value.match(/^(\d+) tokens$/);
+  if (match) {
+    const count = Number(match[1]);
+    return `${count} ${russianPlural(count, "токен", "токена", "токенов")}`;
+  }
+  match = value.match(/^(\d+) sources$/);
+  if (match) {
+    const count = Number(match[1]);
+    return `${count} ${russianPlural(count, "источник", "источника", "источников")}`;
+  }
+  match = value.match(/^(\d+) results$/);
+  if (match) {
+    const count = Number(match[1]);
+    return `${count} ${russianPlural(count, "результат", "результата", "результатов")}`;
+  }
+  match = value.match(/^(\d+)\/(\d+) queries$/);
+  if (match) return `${match[1]}/${match[2]} запросов`;
+
+  match = value.match(/^(\d+) running · (\d+) queued$/);
+  if (match) return `Выполняется: ${match[1]} · в очереди: ${match[2]}`;
+  match = value.match(/^(\d+) more agents?$/);
+  if (match) {
+    const count = Number(match[1]);
+    return `Ещё ${count} ${russianPlural(count, "агент", "агента", "агентов")}`;
+  }
+
+  match = value.match(/^(\d+) servers? configured · (\d+) connected · (\d+) tools$/);
+  if (match) {
+    const servers = Number(match[1]);
+    const connected = Number(match[2]);
+    const tools = Number(match[3]);
+    return `${servers} ${russianPlural(servers, "сервер настроен", "сервера настроено", "серверов настроено")} · подключено: ${connected} · ${tools} ${russianPlural(tools, "инструмент", "инструмента", "инструментов")}`;
+  }
+  match = value.match(/^Reload \((\d+) servers?\)$/);
+  if (match) {
+    const count = Number(match[1]);
+    return `Перезагрузить (${count} ${russianPlural(count, "сервер", "сервера", "серверов")})`;
+  }
+  match = value.match(/^Reconnect all \((\d+) active\)$/);
+  if (match) return `Переподключить все (активно: ${match[1]})`;
+
+  match = value.match(/^Status: (.+?)(?: (\d+)s ago)?$/);
+  if (match) {
+    const status = translateStatus(match[1]) ?? match[1];
+    return match[2] ? `Статус: ${status} · ${match[2]} с назад` : `Статус: ${status}`;
+  }
+
+  match = value.match(/^Pi MCP bridge is (ready|not initialized|not initialized yet)\. Config: (.+)$/);
+  if (match) return `Мост Pi MCP ${translateStatus(match[1]) ?? match[1]}. Конфигурация: ${match[2]}`;
+  match = value.match(/^Pi MCP bridge is (ready|not initialized|not initialized yet)\. Config file: (.+)$/);
+  if (match) return `Мост Pi MCP ${translateStatus(match[1]) ?? match[1]}. Файл конфигурации: ${match[2]}`;
+  match = value.match(/^Writes to (.+)$/);
+  if (match) return `Записывает в ${match[1]}`;
+  match = value.match(/^Authorize (.+)$/);
+  if (match) return `Авторизовать ${match[1]}`;
+
+  match = value.match(/^Default provider and (.+) configuration\. Credentials are persisted in the existing Pi config file\.$/);
+  if (match) return `Провайдер по умолчанию и настройки ${match[1]}. Учётные данные сохраняются в существующем файле конфигурации Pi.`;
+
+  match = value.match(/^Calling (.+)$/);
+  if (match) return `Вызов ${match[1]}`;
+  match = value.match(/^Called (.+)$/);
+  if (match) return `Вызов ${match[1]} завершён`;
+
+  return undefined;
+}
+
+/** Localize one presentation string without mutating runtime data. */
+export function localizeAetherUiText(value: string, hostContext: JsonRecord): string {
+  if (!currentLanguage(hostContext).toLowerCase().startsWith("ru")) return value;
+  return translateText(value);
+}
+
 function translateText(value: string): string {
-  const exact = RU_TEXT[value];
+  const exact = RU_EXTRA_TEXT[value] ?? RU_TEXT[value];
   if (exact) return exact;
   const trimmed = value.trim();
-  const translated = RU_TEXT[trimmed];
+  const translated = RU_EXTRA_TEXT[trimmed] ?? RU_TEXT[trimmed] ?? translateDynamicText(trimmed);
   if (!translated || trimmed === value) return translated ?? value;
   return value.replace(trimmed, translated);
 }

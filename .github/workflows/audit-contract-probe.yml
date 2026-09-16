@@ -2,44 +2,48 @@ name: Audit contracts development check
 on:
   push:
     branches: ['fix/audit-contracts-no-nightly']
-    paths: ['.github/workflows/audit-contract-probe.yml', 'scripts/audit-contracts-dev.py', 'scripts/audit-removal-dev.py']
+    paths: ['.github/workflows/audit-contract-probe.yml', 'scripts/audit-removal-dev.py']
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: audit-contract-probe
   cancel-in-progress: true
 jobs:
   repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      tested_sha: ${{ steps.patch.outputs.tested_sha }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.ref_name }}
           persist-credentials: true
-      - name: Apply inspected source changes
-        if: hashFiles('scripts/audit-contracts-dev.py') != ''
+      - name: Apply inspected removal changes
+        id: patch
         shell: bash
         run: |
           test "$GITHUB_REF_NAME" = 'fix/audit-contracts-no-nightly'
-          python3 scripts/audit-contracts-dev.py
-          npm install --prefix pi-bridge --package-lock-only --ignore-scripts --no-audit --no-fund
-          git diff --check
-          git add extensions/pi-mcp-adapter/aether.ts extensions/pi-subagents/src/aether.ts extensions/pi-web-access/aether.ts pi-bridge/package.json pi-bridge/package-lock.json
-          if ! git diff --cached --quiet; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'fix: check bundled extensions against the shared Aether API'
-            git push origin HEAD:refs/heads/fix/audit-contracts-no-nightly
+          if [ -f scripts/audit-removal-dev.py ]; then
+            python3 scripts/audit-removal-dev.py
+            git diff --check
+            git add app/src/main/java/com/zhousl/aether/data/PiExtensionManager.kt app/src/main/java/com/zhousl/aether/data/AetherSelfManagementTool.kt shared/src/commonMain/kotlin/com/zhousl/aether/data/pi/SharedAgentManagementTools.kt
+            if ! git diff --cached --quiet; then
+              git config user.name 'github-actions[bot]'
+              git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+              git commit -m 'fix: apply extension removal once and report deferred runtime changes'
+              git push origin HEAD:refs/heads/fix/audit-contracts-no-nightly
+            fi
           fi
-      - name: Install compiler and SDK
+          echo "tested_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Check compiler and shared SDK
         run: |
           npm ci --prefix pi-bridge --no-audit --no-fund
           npm ci --prefix packages/extension-api --no-audit --no-fund
           npm run check --prefix packages/extension-api
-      - name: Check all bundled source and SDK contracts
-        shell: bash
-        run: node scripts/check-bundled-extension-types.mjs 2>&1 | tee bundled-types.log
+          node scripts/check-bundled-extension-types.mjs
       - name: Check locale, bridge and real bundled runtime
         shell: bash
         run: |
@@ -50,18 +54,16 @@ jobs:
         if: always()
         with:
           name: contract-repair-reports
-          path: |
-            bundled-types.log
-            runtime-tests.log
+          path: runtime-tests.log
           retention-days: 7
-  removal:
+  android:
+    needs: repair
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ needs.repair.outputs.tested_sha }}
           persist-credentials: false
       - uses: actions/setup-java@v5
         with:
@@ -74,16 +76,31 @@ jobs:
       - uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools'
-      - name: Reproduce removal lifecycle before the production fix
+          log-accepted-android-sdk-licenses: false
+      - name: All Android and shared unit tests, then arm64 debug
         shell: bash
         run: |
           chmod +x gradlew
-          ./gradlew :shared:testDebugUnitTest --tests '*ExtensionRemovalManagementTest' --stacktrace 2>&1 | tee removal-tests.log
+          ./gradlew :shared:testDebugUnitTest :app:testDebugUnitTest :app:assembleDebug --stacktrace 2>&1 | tee android-tests.log
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          for module in ('shared', 'app'):
+              suites = [ET.parse(p).getroot() for p in Path(module, 'build/test-results').rglob('TEST-*.xml')]
+              counts = {key: sum(int(s.attrib.get(key, 0)) for s in suites) for key in ('tests','failures','errors','skipped')}
+              print(module, counts)
+          PY
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: removal-reproducer
+          name: audit-android-reports
           path: |
-            removal-tests.log
+            android-tests.log
             shared/build/test-results/**
+            app/build/test-results/**
+          retention-days: 7
+      - uses: actions/upload-artifact@v7
+        with:
+          name: audit-arm64-debug
+          path: app/build/outputs/apk/debug/*.apk
           retention-days: 7

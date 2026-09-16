@@ -1,0 +1,70 @@
+name: Ruru i18n grammar polish
+
+on:
+  push:
+    branches:
+      - 'fix/complete-russian-ui-0.1.2'
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Polish Russian feature wording
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('shared/src/commonMain/composeResources/values-ru/strings.xml')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              'Спросить Режим агента': 'Спросить в режиме агента',
+              'Виртуальный дисплей Режим агента': 'Виртуальный дисплей режима агента',
+              'Авторизация Режим агента': 'Авторизация режима агента',
+              'использованием Режим агента': 'использованием режима агента',
+              'запуске Режим агента': 'запуске режима агента',
+              'настройки Режим агента': 'настройки режима агента',
+              'настройкой Режим агента': 'настройкой режима агента',
+              'доступа к Режим агента': 'доступа к режиму агента',
+              'авторизацию Режим агента': 'авторизацию режима агента',
+              'готовит Режим агента': 'готовит режим агента',
+              'Кадр повтора Режим агента': 'Кадр повтора режима агента',
+              'выбирает Режим агента': 'выбирает режим агента',
+              'дисплее Режим агента': 'дисплее режима агента',
+              'дисплея Режим агента': 'дисплея режима агента',
+              'Дисплей Режим агента': 'Дисплей режима агента',
+              'в Режим агента': 'в режиме агента',
+              'рабочая область Режим агента': 'рабочая область режима агента',
+              'команды Termux и Режим агента': 'команды Termux и режим агента',
+              'Termux + Режим агента': 'Termux + режим агента',
+              'Termux и Режим агента готовы': 'Termux и режим агента готовы',
+              'Termux и Режим агента автоматически': 'Termux и режим агента автоматически',
+              'Termux и Режим агента.': 'Termux и режим агента.',
+          }
+          for old, new in replacements.items():
+              text = text.replace(old, new)
+          path.write_text(text, encoding='utf-8')
+          PY
+          python3 scripts/check-ruru-locales.py
+          git diff --check
+
+      - name: Commit polish and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/ruru-i18n-polish.yml
+          git add shared/src/commonMain/composeResources/values-ru/strings.xml
+          git diff --cached --check
+          git commit -m 'fix(i18n): polish Russian Agent Mode wording'
+          git push origin HEAD:fix/complete-russian-ui-0.1.2

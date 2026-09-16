@@ -509,6 +509,7 @@ class PiKernelBridge(
         abortOnCancellation: Boolean = type == "run_turn" || type == "complete_once" || type == "follow_up",
         onSetupProgress: (PiCoreSetupUpdate) -> Unit = {},
         startIfNeeded: Boolean = true,
+        expectedProcessGeneration: Long? = null,
     ): JSONObject = withContext(Dispatchers.IO) {
         val id = nextRequestId(type)
         diagnosticLogger.event(
@@ -521,7 +522,8 @@ class PiKernelBridge(
             ),
         )
         val response = CompletableDeferred<PiBridgeFrame>()
-        val eventChannel = onEvent?.let { Channel<PiBridgeFrame>(Channel.UNLIMITED) }
+        val eventChannel = onEvent?.let { createPiBridgeEventChannel<PiBridgeFrame>() }
+        var requestGeneration: Long? = null
         val eventJob = if (onEvent != null && eventChannel != null) {
             eventScope.launch {
                 for (frame in eventChannel) {
@@ -579,6 +581,10 @@ class PiKernelBridge(
             } else {
                 currentLiveProcess() ?: return@withContext JSONObject().put("closed", false)
             }
+            if (expectedProcessGeneration != null && requestProcess.generation != expectedProcessGeneration) {
+                throw PiBridgeException("Pi bridge process changed before request cleanup.", code = "process_generation_changed")
+            }
+            requestGeneration = requestProcess.generation
             pendingRequests[id] = PendingPiBridgeRequest(
                 response = response,
                 processGeneration = requestProcess.generation,
@@ -670,6 +676,40 @@ class PiKernelBridge(
             }
             throw cancellationException
         } catch (throwable: Throwable) {
+            if (throwable is PiBridgeException && throwable.code == "event_queue_overflow") {
+                markRequestCancelled(id)
+                eventChannel?.cancel()
+                eventJob?.cancel()
+                val generation = requestGeneration
+                val cleanupType = when {
+                    abortOnCancellation -> "abort"
+                    type == "subscribe_aether_extensions" -> "unsubscribe_aether_extensions"
+                    else -> null
+                }
+                if (generation != null && cleanupType != null) {
+                    withContext(NonCancellable) {
+                        runCatching {
+                            // Exact request only: never abort a newer turn by session id,
+                            // and never start a replacement Node process just to cancel.
+                            request(
+                                type = cleanupType,
+                                payload = JSONObject().put("request_id", id),
+                                timeoutMillis = PiBridgePingTimeoutMillis,
+                                abortOnCancellation = false,
+                                startIfNeeded = false,
+                                expectedProcessGeneration = generation,
+                            )
+                        }.onFailure { cleanupError ->
+                            diagnosticLogger.exception(
+                                category = "pi_bridge",
+                                event = "overflow_cleanup_failed",
+                                throwable = cleanupError,
+                                requestId = id,
+                            )
+                        }
+                    }
+                }
+            }
             diagnosticLogger.exception(
                 category = "pi_bridge",
                 event = "request_failed",
@@ -680,7 +720,7 @@ class PiKernelBridge(
             throw throwable
         } finally {
             pendingRequests.remove(id)
-            eventChannel?.close()
+            eventChannel?.cancel()
             eventJob?.cancelAndJoin()
         }
     }
@@ -1003,8 +1043,10 @@ class PiKernelBridge(
             return
         }
         when {
+            pending?.response?.isCompleted == true -> Unit
             pending != null && pending.eventChannel != null -> {
-                if (pending.eventChannel.trySend(frame).isFailure) {
+                val queueError = offerPiBridgeEvent(pending.eventChannel, frame)
+                if (queueError != null) {
                     diagnosticLogger.event(
                         category = "pi_bridge",
                         event = "event_channel_send_failed",
@@ -1016,7 +1058,12 @@ class PiKernelBridge(
                         ),
                     )
                     pending.response.completeExceptionally(
-                        PiBridgeException("Pi bridge event queue was closed.", code = "event_queue_closed")
+                        PiBridgeException(
+                            if (queueError == "event_queue_overflow")
+                                "Pi bridge event queue overflowed; the request was stopped. Retry the operation."
+                            else "Pi bridge event queue was closed.",
+                            code = queueError,
+                        )
                     )
                 }
             }

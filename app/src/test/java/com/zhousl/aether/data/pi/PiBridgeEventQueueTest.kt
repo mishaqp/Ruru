@@ -7,6 +7,19 @@ import org.junit.Test
 
 class PiBridgeEventQueueTest {
     @Test
+    fun overflowAndClosedQueuesHaveDistinctErrors() {
+        val queue = createPiBridgeEventChannel<Int>()
+        try {
+            repeat(PiBridgeEventQueueCapacity) { assertEquals(null, offerPiBridgeEvent(queue, it)) }
+            assertEquals("event_queue_overflow", offerPiBridgeEvent(queue, -1))
+            queue.cancel()
+            assertEquals("event_queue_closed", offerPiBridgeEvent(queue, -1))
+        } finally {
+            queue.cancel()
+        }
+    }
+
+    @Test
     fun slowConsumerCannotAccumulateUnboundedEvents() {
         val queue = createPiBridgeEventChannel<Int>()
         try {

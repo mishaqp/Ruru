@@ -1,0 +1,40 @@
+name: Android audit regression work
+on:
+  push:
+    branches: ['fix/android-only-audit-followup']
+permissions:
+  contents: read
+concurrency:
+  group: android-audit-work
+  cancel-in-progress: true
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+        working-directory: pi-bridge
+      - run: npm run build
+        working-directory: pi-bridge
+      - name: Reproduce old callback deadline failures
+        working-directory: pi-bridge
+        shell: bash
+        run: |
+          set +e
+          node --test tests/extension-deadline.test.mjs 2>&1 | tee ../r06-red.log
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0
+          grep -q 'OUTER DEADLINE\|Missing expected rejection' ../r06-red.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: android-audit-red
+          path: r06-red.log
+          retention-days: 7

@@ -241,6 +241,8 @@ const RU_TEXT: Readonly<Record<string, string>> = {
 const RU_EXTRA_TEXT: Readonly<Record<string, string>> = {
   // Common live UI.
   "Add server": "Добавить сервер",
+  "All eligible providers": "Все доступные провайдеры",
+  "API Key": "API-ключ",
   "Authentication": "Аутентификация",
   "Conversation": "Диалог",
   "Name": "Имя",
@@ -449,6 +451,15 @@ function translateStatus(status: string): string | undefined {
 function translateDynamicText(value: string): string | undefined {
   let match: RegExpMatchArray | null;
 
+  // Provider credential help is presentation-only. Keep provider names, env vars
+  // and !command syntax byte-for-byte while translating the surrounding UI.
+  match = value.match(/^(.+) credential\. Accepts a literal key, (\$[A-Z0-9_]+), or a !command source\. Shown as the currently configured value; clearing it removes the credential\.$/);
+  if (match) {
+    return `Учётные данные ${match[1]}. Поддерживаются ключ, ${match[2]} или источник !command. Показано текущее настроенное значение; очистка удалит учётные данные.`;
+  }
+  match = value.match(/^Literal key, (\$[A-Z0-9_]+), or !command$/);
+  if (match) return `Ключ, ${match[1]} или !command`;
+
   match = value.match(/^([●▲○✓✗]\s*|🔑\s*)?(connected|failed|auth required|needs auth|needs-auth|not connected|not-connected|running|queued|completed|stopped|aborted|steered|error)$/i);
   if (match) {
     const translated = translateStatus(match[2]);
@@ -514,7 +525,7 @@ function translateDynamicText(value: string): string | undefined {
   match = value.match(/^Status: (.+?)(?: (\d+)s ago)?$/);
   if (match) {
     const status = translateStatus(match[1]) ?? match[1];
-    return match[2] ? `Статус: ${status} · ${match[2]} с назад` : `Статус: ${status}`;
+    return match[2] ? `Статус: ${status} · ${match[2]} сек. назад` : `Статус: ${status}`;
   }
 
   match = value.match(/^Pi MCP bridge is (ready|not initialized|not initialized yet)\. Config: (.+)$/);

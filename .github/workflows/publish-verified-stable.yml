@@ -1,0 +1,121 @@
+name: Verify merged fixes and publish stable 0.1.4-ruru.1
+on:
+  push:
+    branches: ['release/verified-stable-0.1.4-ruru.1']
+    paths: ['.github/workflows/publish-verified-stable.yml']
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: verified-stable-0.1.4-ruru.1
+  cancel-in-progress: false
+jobs:
+  verify-and-dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: e76a9e8e9966c3dd387f72ede2c9c96e73043450
+      VERSION_NAME: 0.1.4-ruru.1
+      VERSION_CODE: '10401'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: e76a9e8e9966c3dd387f72ede2c9c96e73043450
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: enhanced
+          cache-read-only: false
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: false
+      - name: Verify combined main, not an individual PR branch
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          python3 scripts/check-ruru-locales.py
+          chmod +x gradlew
+          ./gradlew :shared:testDebugUnitTest :app:testDebugUnitTest :app:assembleDebug --stacktrace
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          report = {}
+          for module in ('shared', 'app'):
+              suites = [ET.parse(p).getroot() for p in Path(module, 'build/test-results').rglob('TEST-*.xml')]
+              assert suites, f'Missing {module} tests'
+              totals = {key: sum(int(s.attrib.get(key, 0)) for s in suites) for key in ('tests', 'failures', 'errors', 'skipped')}
+              assert totals['tests'] > 0 and totals['failures'] == totals['errors'] == totals['skipped'] == 0, totals
+              report[module] = totals
+          names = [str(p) for p in Path('.').glob('*/build/test-results/**/TEST-*.xml')]
+          for required in ('ExtensionRemovalTest', 'ExtensionRemovalManagementTest', 'BundledExtensionLockMigrationTest'):
+              assert any(required in p for p in names), f'Missing regression suite: {required}'
+          Path('merged-verification.json').write_text(json.dumps(report, indent=2))
+          print(json.dumps(report, indent=2))
+          PY
+      - name: Tag verified source and dispatch existing permanent-signing workflow
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+          from urllib.error import HTTPError
+          repo = os.environ['GITHUB_REPOSITORY']
+          assert repo == 'mishaqp/Ruru'
+          source = os.environ['SOURCE_SHA']
+          version = os.environ['VERSION_NAME']
+          code = int(os.environ['VERSION_CODE'])
+          tag = 'v' + version
+          def api(path, method='GET', data=None, missing=False):
+              body = None if data is None else json.dumps(data).encode()
+              request = Request('https://api.github.com/repos/' + repo + '/' + path, data=body, method=method,
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json',
+                           'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2026-03-10'})
+              try:
+                  with urlopen(request, timeout=45) as response:
+                      raw = response.read()
+                      return json.loads(raw) if raw else {}
+              except HTTPError as error:
+                  if missing and error.code == 404: return None
+                  raise RuntimeError(f'{method} {path}: HTTP {error.code}: {error.read().decode()[:600]}') from None
+          for number in (12, 13):
+              pr = api(f'pulls/{number}')
+              assert pr['merged'], f'PR {number} is not merged'
+              compare = api('compare/' + pr['merge_commit_sha'] + '...' + source)
+              assert compare['status'] in ('ahead', 'identical'), f'PR {number} missing from release source'
+          latest = api('releases/latest', missing=True)
+          if latest:
+              match = re.fullmatch(r'v?(\d+)\.(\d+)\.(\d+)-ruru\.(\d+)', latest['tag_name'])
+              assert match, 'Cannot safely compare current stable version'
+              major, minor, patch, revision = map(int, match.groups())
+              assert code > major * 1000000 + minor * 10000 + patch * 100 + revision, 'Refusing an obsolete stable release'
+          assert api('releases/tags/' + tag, missing=True) is None, 'Release already exists; do not overwrite it'
+          ref = api('git/ref/tags/' + tag, missing=True)
+          if ref is None:
+              api('git/refs', 'POST', {'ref': 'refs/tags/' + tag, 'sha': source})
+          else:
+              assert ref['object']['sha'] == source and ref['object']['type'] == 'commit', 'Existing tag targets different code'
+          result = api('actions/workflows/release-ruru.yml/dispatches', 'POST', {
+              'ref': tag, 'inputs': {'version_name': version, 'version_code': str(code)}})
+          result.update({'tag': tag, 'source_sha': source, 'version_code': code})
+          Path('stable-dispatch.json').write_text(json.dumps(result, indent=2))
+          print(json.dumps(result, indent=2))
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: verified-stable-main-reports
+          path: |
+            merged-verification.json
+            stable-dispatch.json
+            app/build/test-results/**
+            shared/build/test-results/**
+          retention-days: 14

@@ -1,0 +1,44 @@
+name: Extension contract probe
+on:
+  push:
+    branches: ['fix/audit-extension-contracts']
+    paths: ['.github/workflows/audit-contract-probe.yml', 'scripts/audit-contract-*.py']
+permissions:
+  contents: read
+concurrency:
+  group: extension-contract-probe
+  cancel-in-progress: false
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [pi-mcp-adapter, pi-subagents, pi-web-access]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Inspect and typecheck the real package
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          set -o pipefail
+          cd "extensions/$PACKAGE"
+          echo "Node: $(node --version)"
+          if test -f package-lock.json; then
+            npm ci --ignore-scripts --omit=optional --legacy-peer-deps --no-audit --no-fund 2>&1 | tee ../../install-$PACKAGE.log
+          else
+            npm install --ignore-scripts --omit=optional --legacy-peer-deps --no-audit --no-fund 2>&1 | tee ../../install-$PACKAGE.log
+          fi
+          npm run typecheck 2>&1 | tee ../../typecheck-$PACKAGE.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: extension-contract-${{ matrix.package }}
+          path: |
+            install-*.log
+            typecheck-*.log
+          retention-days: 7

@@ -1,0 +1,63 @@
+name: Ruru i18n provider polish
+
+on:
+  push:
+    branches:
+      - 'fix/complete-russian-ui-0.1.2'
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Patch provider presentation localization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('pi-bridge/src/aether-ui-i18n.ts')
+          text = path.read_text(encoding='utf-8')
+
+          old = '  "Add server": "Добавить сервер",\n  "Authentication": "Аутентификация",'
+          new = '  "Add server": "Добавить сервер",\n  "All eligible providers": "Все доступные провайдеры",\n  "API Key": "API-ключ",\n  "Authentication": "Аутентификация",'
+          if old not in text:
+              raise SystemExit('RU_EXTRA_TEXT insertion marker missing')
+          text = text.replace(old, new, 1)
+
+          old = '''function translateDynamicText(value: string): string | undefined {\n  let match: RegExpMatchArray | null;\n\n  match = value.match(/^([●▲○✓✗]\\s*|🔑\\s*)?(connected|failed|auth required|needs auth|needs-auth|not connected|not-connected|running|queued|completed|stopped|aborted|steered|error)$/i);'''
+          new = '''function translateDynamicText(value: string): string | undefined {\n  let match: RegExpMatchArray | null;\n\n  // Provider credential help is presentation-only. Keep provider names, env vars\n  // and !command syntax byte-for-byte while translating the surrounding UI.\n  match = value.match(/^(.+) credential\\. Accepts a literal key, (\\$[A-Z0-9_]+), or a !command source\\. Shown as the currently configured value; clearing it removes the credential\\.$/);\n  if (match) {\n    return `Учётные данные ${match[1]}. Поддерживаются ключ, ${match[2]} или источник !command. Показано текущее настроенное значение; очистка удалит учётные данные.`;\n  }\n  match = value.match(/^Literal key, (\\$[A-Z0-9_]+), or !command$/);\n  if (match) return `Ключ, ${match[1]} или !command`;\n\n  match = value.match(/^([●▲○✓✗]\\s*|🔑\\s*)?(connected|failed|auth required|needs auth|needs-auth|not connected|not-connected|running|queued|completed|stopped|aborted|steered|error)$/i);'''
+          if old not in text:
+              raise SystemExit('translateDynamicText insertion marker missing')
+          text = text.replace(old, new, 1)
+
+          text = text.replace('`Статус: ${status} · ${match[2]} с назад`', '`Статус: ${status} · ${match[2]} сек. назад`')
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          cd pi-bridge
+          npm ci --no-audit --no-fund
+          npm run check
+          cd ..
+          python3 scripts/check-ruru-locales.py
+          git diff --check
+
+      - name: Commit and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/ruru-i18n-provider-polish.yml
+          git add pi-bridge/src/aether-ui-i18n.ts
+          git diff --cached --check
+          git commit -m 'feat(i18n): localize dynamic provider presentation strings'
+          git push origin HEAD:fix/complete-russian-ui-0.1.2

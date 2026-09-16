@@ -1,6 +1,7 @@
 package com.zhousl.aether.runtime
 
 import java.io.File
+import java.security.MessageDigest
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -9,7 +10,7 @@ import org.junit.rules.TemporaryFolder
 class BundledExtensionLockMigrationTest {
     @get:Rule val temporary = TemporaryFolder()
     private fun put(root: File, path: String, text: String) {
-        File(root, path).apply { parentFile.mkdirs(); writeText(text) }
+        File(root, path).apply { checkNotNull(parentFile).mkdirs(); writeText(text) }
     }
     private fun bundle(root: File, version: String, lock: String? = null) {
         put(root, "package.json", "{\"name\":\"fixture\",\"version\":\"$version\"}")
@@ -87,5 +88,30 @@ class BundledExtensionLockMigrationTest {
         })
         assertEquals("user modified managed lock", File(target, "package-lock.json").readText())
         assertTrue(backups(state).isEmpty())
+    }
+
+    @Test fun aConflictingBackupStopsTheUpgradeWithoutChangingInstalledData() {
+        val root = temporary.newFolder("extensions")
+        val state = temporary.newFolder("state")
+        val target = File(root, "fixture").apply { mkdirs() }
+        bundle(target, "1")
+        val baseline = BundledExtensionInstaller.sourceHashes(target)
+        val oldLock = "keep this lock exactly"
+        put(target, "package-lock.json", oldLock)
+        val digest = MessageDigest.getInstance("SHA-256").digest(oldLock.toByteArray())
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val archive = File(state, "fixture.npm-lock-$digest.json")
+        archive.writeText("different existing backup")
+        val installer = BundledExtensionInstaller(root, state)
+        try {
+            installer.install("fixture", baseline) { bundle(it, "2", "new lock") }
+            fail("An invalid existing backup must not be overwritten")
+        } catch (expected: IllegalStateException) {
+            assertTrue(expected.message.orEmpty().contains("archived local npm lock"))
+        }
+        assertEquals(oldLock, File(target, "package-lock.json").readText())
+        assertTrue(File(target, "index.ts").readText().contains("'1'"))
+        assertEquals("different existing backup", archive.readText())
+        assertFalse(File(state, "fixture.stage").exists())
     }
 }

@@ -2,7 +2,7 @@ name: Audit repair development
 on:
   push:
     branches: ['fix/audit-stability-no-nightly']
-    paths: ['.github/workflows/audit-development.yml', 'scripts/apply-audit-repairs.py']
+    paths: ['.github/workflows/audit-development.yml', 'scripts/apply-audit-repairs.py', 'scripts/apply-audit-installer.py']
 permissions:
   contents: write
 concurrency:
@@ -12,29 +12,45 @@ jobs:
   repair:
     if: github.repository == 'mishaqp/Ruru' && github.ref == 'refs/heads/fix/audit-stability-no-nightly'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
           ref: fix/audit-stability-no-nightly
           fetch-depth: 0
-      - name: Apply fail-closed source patches
-        run: python3 scripts/apply-audit-repairs.py
-      - name: Record exact source changes on the feature branch only
-        run: |
-          git add pi-bridge/src/aether-ui-i18n.ts pi-bridge/src/extension-dependencies.ts extensions/pi-subagents/src/agent-runner.ts extensions/pi-subagents/src/agent-manager.ts app/src/main/java/com/zhousl/aether/data/pi/PiKernelBridge.kt
-          git diff --cached --check
-          if ! git diff --cached --quiet; then
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: protect UI data and honour startup cancellation'
-            git push origin HEAD:refs/heads/fix/audit-stability-no-nightly
-          fi
-          git rev-parse HEAD
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Install locked test dependencies
         working-directory: pi-bridge
         run: npm ci --no-audit --no-fund
+      - name: Verify disabled-extension regression fails on the old loader
+        working-directory: pi-bridge
+        shell: bash
+        run: |
+          if ! grep -q 'newly disabled/removed' src/aether-extensions.ts; then
+            npm run build
+            set +e
+            node --test tests/audit-lifecycle.test.mjs > ../rollback-before.log 2>&1
+            result=$?
+            set -e
+            cat ../rollback-before.log
+            test "$result" -ne 0
+            grep -q 'disabled extension survives failed reload' ../rollback-before.log
+          fi
+      - name: Apply fail-closed source patches
+        run: |
+          python3 scripts/apply-audit-repairs.py
+          python3 scripts/apply-audit-installer.py
+      - name: Record source changes on the feature branch only
+        run: |
+          git add pi-bridge/src/aether-ui-i18n.ts pi-bridge/src/extension-dependencies.ts pi-bridge/src/aether-extensions.ts pi-bridge/tests/bundled-runtime.test.mjs extensions/pi-subagents/src/agent-runner.ts extensions/pi-subagents/src/agent-manager.ts app/src/main/java/com/zhousl/aether/data/pi/PiKernelBridge.kt app/src/main/java/com/zhousl/aether/runtime/AlpineRuntime.kt app/src/main/assets/ruru-extension-baselines
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: upgrade verified bundles and honour disabled state after failed reload'
+            git push origin HEAD:refs/heads/fix/audit-stability-no-nightly
+          fi
+          git rev-parse HEAD
       - name: Validate locales and TypeScript
         run: |
           python3 scripts/check-ruru-locales.py
@@ -44,8 +60,30 @@ jobs:
         working-directory: pi-bridge
         shell: bash
         run: npm test 2>&1 | tee ../audit-repair-tests.log
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: enhanced
+          cache-read-only: false
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+      - name: Android and shared unit tests
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :shared:testDebugUnitTest :app:testDebugUnitTest --stacktrace
+      - name: Debug APK only
+        run: ./gradlew :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: audit-repair-tests
-          path: audit-repair-tests.log
+          name: audit-repair-results
+          path: |
+            audit-repair-tests.log
+            rollback-before.log
+            app/build/test-results/**
+            shared/build/test-results/**
+            app/build/outputs/apk/debug/*.apk

@@ -539,7 +539,11 @@ function finalTurnError(session: AgentSession, startIndex = 0): string | undefin
  */
 function forwardAbortSignal(session: AgentSession, signal?: AbortSignal): () => void {
   if (!signal) return () => {};
-  const onAbort = () => session.abort();
+  const onAbort = () => { void session.abort().catch(() => {}); };
+  if (signal.aborted) {
+    onAbort();
+    return () => {};
+  }
   signal.addEventListener("abort", onAbort, { once: true });
   return () => signal.removeEventListener("abort", onAbort);
 }
@@ -557,6 +561,7 @@ export async function runAgent(
   prompt: string,
   options: RunOptions,
 ): Promise<RunResult> {
+  options.signal?.throwIfAborted();
   const config = getConfig(type);
   const agentConfig = getAgentConfig(type);
 
@@ -567,6 +572,7 @@ export async function runAgent(
   const configCwd = options.configCwd ?? effectiveCwd;
 
   const env = await detectEnv(options.pi, effectiveCwd);
+  options.signal?.throwIfAborted();
 
   // Get parent system prompt for append-mode agents
   const parentSystemPrompt = ctx.getSystemPrompt();
@@ -701,6 +707,7 @@ export async function runAgent(
     appendSystemPromptOverride: () => [],
   });
   await runInChildSessionContext(() => loader.reload());
+  options.signal?.throwIfAborted();
 
   // Plain entries in `tools:` are expected to be built-in names (extension tools
   // go through `ext:`), so an unknown name there is unambiguously a typo. Previously
@@ -919,116 +926,125 @@ export async function runAgent(
   }
 
   const { session } = await runInChildSessionContext(() => createAgentSession(sessionOpts));
+  const cleanupStartupAbort = forwardAbortSignal(session, options.signal);
+  try {
+    options.signal?.throwIfAborted();
+    const baseSessionName = agentConfig?.name ?? type;
+    session.setSessionName(
+      options.agentId ? `${baseSessionName}#${options.agentId.slice(0, 8)}` : baseSessionName,
+    );
 
-  const baseSessionName = agentConfig?.name ?? type;
-  session.setSessionName(
-    options.agentId ? `${baseSessionName}#${options.agentId.slice(0, 8)}` : baseSessionName,
-  );
-
-  // Bind extensions so that session_start fires and extensions can initialize
-  // (e.g. loading credentials, setting up state). Tool gating already happened
-  // at session construction via the `tools:` allowlist above — no separate
-  // post-bind filter is needed. All ExtensionBindings fields are optional.
-  await session.bindExtensions({
-    onError: (err) => {
-      options.onToolActivity?.({
-        type: "end",
-        toolName: `extension-error:${err.extensionPath}`,
-      });
-    },
-  });
-
-  // With `allowedToolNames` unset, the registry is scoped by `excludeTools` but
-  // the ACTIVE set still needs managing: pi activates only its four default
-  // built-ins at turn 1, and `ext:` narrowing has no registry-level expression
-  // (we can't deny the name of a tool that hasn't registered yet). Both are
-  // handled below by re-deriving scope from the loader's live extension maps —
-  // `registerTool` writes into those same maps, so late arrivals are judged too.
-  if (!noExtensions) {
-    installExtensionToolScope(session, {
-      loader,
-      toolNames,
-      disallowedSet,
-      extNames,
-      narrowing,
-      nestedToolNames,
+    // Bind extensions so that session_start fires and extensions can initialize
+    // (e.g. loading credentials, setting up state). Tool gating already happened
+    // at session construction via the `tools:` allowlist above — no separate
+    // post-bind filter is needed. All ExtensionBindings fields are optional.
+    await session.bindExtensions({
+      onError: (err) => {
+        options.onToolActivity?.({
+          type: "end",
+          toolName: `extension-error:${err.extensionPath}`,
+        });
+      },
     });
-  }
 
-  options.onSessionCreated?.(session);
+    // With `allowedToolNames` unset, the registry is scoped by `excludeTools` but
+    // the ACTIVE set still needs managing: pi activates only its four default
+    // built-ins at turn 1, and `ext:` narrowing has no registry-level expression
+    // (we can't deny the name of a tool that hasn't registered yet). Both are
+    // handled below by re-deriving scope from the loader's live extension maps —
+    // `registerTool` writes into those same maps, so late arrivals are judged too.
+    if (!noExtensions) {
+      installExtensionToolScope(session, {
+        loader,
+        toolNames,
+        disallowedSet,
+        extNames,
+        narrowing,
+        nestedToolNames,
+      });
+    }
 
-  // Track turns for graceful max_turns enforcement
-  let turnCount = 0;
-  const maxTurns = normalizeMaxTurns(options.maxTurns ?? agentConfig?.maxTurns ?? defaultMaxTurns);
-  let softLimitReached = false;
-  let aborted = false;
+    options.signal?.throwIfAborted();
+    options.onSessionCreated?.(session);
 
-  let currentMessageText = "";
-  const unsubTurns = session.subscribe((event: AgentSessionEvent) => {
-    if (event.type === "turn_end") {
-      turnCount++;
-      options.onTurnEnd?.(turnCount);
-      if (maxTurns != null) {
-        if (!softLimitReached && turnCount >= maxTurns) {
-          softLimitReached = true;
-          session.steer("You have reached your turn limit. Wrap up immediately — provide your final answer now.");
-        } else if (softLimitReached && turnCount >= maxTurns + graceTurns) {
-          aborted = true;
-          session.abort();
+    // Track turns for graceful max_turns enforcement
+    let turnCount = 0;
+    const maxTurns = normalizeMaxTurns(options.maxTurns ?? agentConfig?.maxTurns ?? defaultMaxTurns);
+    let softLimitReached = false;
+    let aborted = false;
+
+    let currentMessageText = "";
+    const unsubTurns = session.subscribe((event: AgentSessionEvent) => {
+      if (event.type === "turn_end") {
+        turnCount++;
+        options.onTurnEnd?.(turnCount);
+        if (maxTurns != null) {
+          if (!softLimitReached && turnCount >= maxTurns) {
+            softLimitReached = true;
+            session.steer("You have reached your turn limit. Wrap up immediately — provide your final answer now.");
+          } else if (softLimitReached && turnCount >= maxTurns + graceTurns) {
+            aborted = true;
+            session.abort();
+          }
         }
       }
-    }
-    if (event.type === "message_start") {
-      currentMessageText = "";
-    }
-    if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
-      currentMessageText += event.assistantMessageEvent.delta;
-      options.onTextDelta?.(event.assistantMessageEvent.delta, currentMessageText);
-    }
-    if (event.type === "tool_execution_start") {
-      options.onToolActivity?.({ type: "start", toolName: event.toolName });
-    }
-    if (event.type === "tool_execution_end") {
-      options.onToolActivity?.({ type: "end", toolName: event.toolName });
-    }
-    if (event.type === "message_end" && event.message.role === "assistant") {
-      const u = (event.message as any).usage;
-      if (u) options.onAssistantUsage?.({
-        input: u.input ?? 0,
-        output: u.output ?? 0,
-        cacheWrite: u.cacheWrite ?? 0,
-      });
-    }
-    if (event.type === "compaction_end" && !event.aborted && event.result) {
-      options.onCompaction?.({ reason: event.reason, tokensBefore: event.result.tokensBefore });
-    }
-  });
+      if (event.type === "message_start") {
+        currentMessageText = "";
+      }
+      if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
+        currentMessageText += event.assistantMessageEvent.delta;
+        options.onTextDelta?.(event.assistantMessageEvent.delta, currentMessageText);
+      }
+      if (event.type === "tool_execution_start") {
+        options.onToolActivity?.({ type: "start", toolName: event.toolName });
+      }
+      if (event.type === "tool_execution_end") {
+        options.onToolActivity?.({ type: "end", toolName: event.toolName });
+      }
+      if (event.type === "message_end" && event.message.role === "assistant") {
+        const u = (event.message as any).usage;
+        if (u) options.onAssistantUsage?.({
+          input: u.input ?? 0,
+          output: u.output ?? 0,
+          cacheWrite: u.cacheWrite ?? 0,
+        });
+      }
+      if (event.type === "compaction_end" && !event.aborted && event.result) {
+        options.onCompaction?.({ reason: event.reason, tokensBefore: event.result.tokensBefore });
+      }
+    });
 
-  const collector = collectResponseText(session);
-  const cleanupAbort = forwardAbortSignal(session, options.signal);
+    const collector = collectResponseText(session);
 
-  // Build the effective prompt: optionally prepend parent context
-  let effectivePrompt = prompt;
-  if (options.inheritContext) {
-    const parentContext = buildParentContext(ctx);
-    if (parentContext) {
-      effectivePrompt = parentContext + prompt;
+    // Build the effective prompt: optionally prepend parent context
+    let effectivePrompt = prompt;
+    if (options.inheritContext) {
+      const parentContext = buildParentContext(ctx);
+      if (parentContext) {
+        effectivePrompt = parentContext + prompt;
+      }
     }
-  }
 
-  // Boundary for the history fallback: only assistant text produced from here
-  // on counts as this run's output (a fresh session, so usually 0).
-  const startLen = session.messages.length;
-  try {
-    await session.prompt(effectivePrompt);
+    // Boundary for the history fallback: only assistant text produced from here
+    // on counts as this run's output (a fresh session, so usually 0).
+    const startLen = session.messages.length;
+    try {
+      options.signal?.throwIfAborted();
+      await session.prompt(effectivePrompt);
+    } finally {
+      unsubTurns();
+      collector.unsubscribe();
+    }
+
+    const responseText = collector.getText().trim() || getLastAssistantText(session, startLen);
+    return { responseText, session, aborted, steered: softLimitReached, failure: finalTurnError(session, startLen) };
+  } catch (error) {
+    try { await session.abort(); } catch { /* preserve the original failure */ }
+    try { session.dispose(); } catch { /* preserve the original failure */ }
+    throw error;
   } finally {
-    unsubTurns();
-    collector.unsubscribe();
-    cleanupAbort();
+    cleanupStartupAbort();
   }
-
-  const responseText = collector.getText().trim() || getLastAssistantText(session, startLen);
-  return { responseText, session, aborted, steered: softLimitReached, failure: finalTurnError(session, startLen) };
 }
 
 /**
@@ -1047,6 +1063,7 @@ export async function resumeAgent(
   // Boundary for the history fallback: the session already holds prior turns,
   // so only assistant text produced by THIS resume prompt counts as its output
   // — a failed resume must not surface the previous turn's answer (#144).
+  options.signal?.throwIfAborted();
   const startLen = session.messages.length;
   const collector = collectResponseText(session);
   const cleanupAbort = forwardAbortSignal(session, options.signal);
@@ -1070,6 +1087,7 @@ export async function resumeAgent(
     : () => {};
 
   try {
+    options.signal?.throwIfAborted();
     await session.prompt(prompt);
   } finally {
     collector.unsubscribe();

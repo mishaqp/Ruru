@@ -33,12 +33,19 @@ function hasRuntimeDependencies(manifest: Record<string, unknown>): boolean {
   });
 }
 
-function dependencyFingerprint(manifest: Record<string, unknown>): string {
+function dependencyFingerprint(manifest: Record<string, unknown>, packageRoot: string): string {
   const dependencies = Object.fromEntries(
     DEPENDENCY_FIELDS.map((field) => [field, manifest[field] ?? null]),
   );
+  const lockfile = path.join(packageRoot, "package-lock.json");
   return createHash("sha256")
-    .update(JSON.stringify(dependencies))
+    .update(JSON.stringify({
+      dependencies,
+      lockfile: fs.existsSync(lockfile) ? fs.readFileSync(lockfile, "utf8") : null,
+      platform: process.platform,
+      arch: process.arch,
+      nodeMajor: process.versions.node.split(".")[0],
+    }))
     .digest("hex");
 }
 
@@ -127,7 +134,7 @@ export async function ensureExtensionPackageDependencies(packageRoot: string): P
 
   const nodeModules = path.join(resolvedRoot, "node_modules");
   const marker = path.join(nodeModules, INSTALL_MARKER_NAME);
-  const fingerprint = dependencyFingerprint(manifest);
+  const fingerprint = dependencyFingerprint(manifest, resolvedRoot);
   // A node_modules directory can be left behind by an interrupted npm run.
   // Only a marker for the current manifest proves the tree is complete.
   if (fs.existsSync(marker) && fs.readFileSync(marker, "utf8").trim() === fingerprint) return;

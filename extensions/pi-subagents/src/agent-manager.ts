@@ -352,7 +352,8 @@ export class AgentManager {
     let detachParentSignal: (() => void) | undefined;
     if (options.signal) {
       const onParentAbort = () => this.abort(id);
-      options.signal.addEventListener("abort", onParentAbort, { once: true });
+      if (options.signal.aborted) onParentAbort();
+      else options.signal.addEventListener("abort", onParentAbort, { once: true });
       detachParentSignal = () => options.signal!.removeEventListener("abort", onParentAbort);
     }
     const detach = () => { detachParentSignal?.(); detachParentSignal = undefined; };
@@ -714,7 +715,8 @@ export class AgentManager {
     let detachParentSignal: (() => void) | undefined;
     if (parentSignal) {
       const onParentAbort = () => this.abort(id);
-      parentSignal.addEventListener("abort", onParentAbort, { once: true });
+      if (parentSignal.aborted) onParentAbort();
+      else parentSignal.addEventListener("abort", onParentAbort, { once: true });
       detachParentSignal = () => parentSignal.removeEventListener("abort", onParentAbort);
     }
 

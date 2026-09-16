@@ -1216,7 +1216,11 @@ async function loadAetherAppExtensionsUnlocked(
       }
     }
   }
-  if (candidate.errors.length > 0 && successfulLoads === 0) {
+  // Restoring the whole previous runtime is valid only when every old
+  // extension is still permitted and retained. A newly disabled/removed
+  // extension must not be resurrected because a different package failed.
+  if (candidate.errors.length > 0 && successfulLoads === 0 &&
+      previous.extensions.every((extension) => preservedExtensions.has(extension))) {
     await cleanupRuntime(candidate, candidate, preservedExtensions);
     for (const error of candidate.errors) recordRuntimeError(previous, error);
     bumpVersion();

@@ -30,6 +30,7 @@ jobs:
               - 'pi-bridge/**'
               - 'extensions/**'
               - 'scripts/check-ruru-locales.py'
+              - 'scripts/check-ruru-bundle-assets.py'
               - 'packages/extension-api/**'
               - 'third_party/termux/**'
               - '.github/workflows/build-nightly-apk.yml'
@@ -73,6 +74,8 @@ jobs:
         run: ./gradlew :shared:testDebugUnitTest :app:testDebugUnitTest --stacktrace
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Validate bundled migration assets inside the APK
+        run: python3 scripts/check-ruru-bundle-assets.py app/build/outputs/apk/debug/*.apk
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:

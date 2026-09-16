@@ -601,19 +601,31 @@ function translateText(value: string): string {
   return value.replace(trimmed, translated);
 }
 
-function localizeValue(value: unknown, key = ""): unknown {
+// Only descend through declarative UI containers. Arbitrary extension data
+// (args, payload, storage, values, schemas, prompts, etc.) is opaque, even when
+// it happens to contain keys such as text, label or description.
+const PRESENTATION_CONTAINERS = new Set([
+  "surfaces", "components", "tree", "children", "settings", "sections",
+  "categories", "options", "actions", "details", "items", "composer_menu_items",
+  "message_types", "tool_titles", "custom_messages", "errors",
+]);
+
+function localizeValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map((entry) => localizeValue(entry));
-  if (value && typeof value === "object") {
-    const result: JsonRecord = {};
-    for (const [childKey, childValue] of Object.entries(value as JsonRecord)) {
-      result[childKey] = localizeValue(childValue, childKey);
+  if (!value || typeof value !== "object") return value;
+  const object = value as JsonRecord;
+  const literalContent = object.type === "code" || object.type === "web" || object.type === "html";
+  const result: JsonRecord = {};
+  for (const [key, child] of Object.entries(object)) {
+    if (typeof child === "string" && PRESENTATION_KEYS.has(key) && !(literalContent && key === "text")) {
+      result[key] = translateText(child);
+    } else if (PRESENTATION_CONTAINERS.has(key)) {
+      result[key] = localizeValue(child);
+    } else {
+      result[key] = child;
     }
-    return result;
   }
-  if (typeof value === "string" && PRESENTATION_KEYS.has(key)) {
-    return translateText(value);
-  }
-  return value;
+  return result;
 }
 
 /**

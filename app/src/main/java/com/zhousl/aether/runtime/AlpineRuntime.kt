@@ -243,36 +243,47 @@ class AlpineRuntime(
     }
 
     suspend fun installPreinstalledExtensions(): Unit = withContext(Dispatchers.IO) {
-        installAssetDirectoryRecursively("extensions", "/root/.aether/extensions")
+        installBundledExtensions()
     }
 
     internal fun installPreinstalledExtensionsSync() {
-        installAssetDirectoryRecursively("extensions", "/root/.aether/extensions")
+        installBundledExtensions()
     }
 
-    private fun installAssetDirectoryRecursively(assetDir: String, guestTargetDir: String) {
-        val list = runCatching { appContext.assets.list(assetDir) }.getOrNull() ?: return
-        if (list.isEmpty()) return
-        for (item in list) {
-            if (
-                assetDir == "extensions" &&
-                guestPathToHostFile("/root/.aether/.removed-preinstalled-extensions/$item").existsNoFollow()
-            ) {
-                continue
+    private fun installBundledExtensions() {
+        val targetRoot = guestPathToHostFile("/root/.aether/extensions")
+        val stateRoot = guestPathToHostFile("/root/.aether/.ruru-bundle-install")
+        val installer = BundledExtensionInstaller(targetRoot, stateRoot)
+        for (name in appContext.assets.list("extensions").orEmpty().sorted()) {
+            if (guestPathToHostFile("/root/.aether/.removed-preinstalled-extensions/$name").existsNoFollow()) continue
+            val baseline = runCatching {
+                val properties = java.util.Properties()
+                appContext.assets.open("ruru-extension-baselines/$name.properties").reader().use { properties.load(it) }
+                properties.stringPropertyNames().associateWith { properties.getProperty(it) }
+            }.getOrDefault(emptyMap())
+            val result = installer.install(name, baseline) { stage ->
+                copyBundledAssetDirectory("extensions/$name", stage)
             }
-            val childAssetPath = "$assetDir/$item"
-            val childGuestPath = "$guestTargetDir/$item"
-            // Aether extensions are shared with user imports. Once a user owns a
-            // top-level entry, never merge or overwrite it with bundled files.
-            val existingTarget = guestPathToHostFile(normalizePath(childGuestPath))
-            if (existingTarget.existsNoFollow()) continue
-            val subList = runCatching { appContext.assets.list(childAssetPath) }.getOrNull()
-            if (subList != null && subList.isNotEmpty()) {
-                installAssetDirectoryRecursively(childAssetPath, childGuestPath)
+            diagnosticLogger.event(
+                category = "extensions",
+                event = "bundled_extension_sync",
+                level = if (result == BundleInstallResult.PreservedLocalChanges) "warn" else "info",
+                details = mapOf("extension" to name, "result" to result.name),
+            )
+        }
+    }
+
+    private fun copyBundledAssetDirectory(assetPath: String, output: File) {
+        check(output.mkdirs() || output.isDirectory) { "Unable to create bundled extension staging directory." }
+        for (name in appContext.assets.list(assetPath).orEmpty()) {
+            require(name != "." && name != ".." && '/' !in name && '\\' !in name) { "Invalid bundled asset name." }
+            val childPath = "$assetPath/$name"
+            val child = File(output, name)
+            if (appContext.assets.list(childPath).orEmpty().isNotEmpty()) {
+                copyBundledAssetDirectory(childPath, child)
             } else {
-                runCatching {
-                    val target = guestPathToHostFile(normalizePath(childGuestPath))
-                    copyAsset(childAssetPath, target, executable = false)
+                appContext.assets.open(childPath).use { input ->
+                    child.outputStream().use { destination -> input.copyTo(destination) }
                 }
             }
         }

@@ -521,7 +521,7 @@ class PiKernelBridge(
             ),
         )
         val response = CompletableDeferred<PiBridgeFrame>()
-        val eventChannel = onEvent?.let { Channel<PiBridgeFrame>(Channel.UNLIMITED) }
+        val eventChannel = onEvent?.let { newPiBridgeEventChannel<PiBridgeFrame>() }
         val eventJob = if (onEvent != null && eventChannel != null) {
             eventScope.launch {
                 for (frame in eventChannel) {
@@ -670,6 +670,34 @@ class PiKernelBridge(
             }
             throw cancellationException
         } catch (throwable: Throwable) {
+            if (throwable is PiBridgeException && throwable.code == PiBridgeEventQueueOverflowCode) {
+                markRequestCancelled(id)
+                eventChannel?.cancel()
+                eventJob?.cancel()
+                // Do not block stdout or terminate unrelated chats. Abort this
+                // request explicitly; overflowing is a failure, never success.
+                withContext(NonCancellable) {
+                    runCatching {
+                        when {
+                            abortOnCancellation -> request(
+                                type = "abort",
+                                payload = JSONObject().put("request_id", id)
+                                    .put("session_id", payload.optString("session_id")),
+                                timeoutMillis = PiBridgePingTimeoutMillis,
+                                abortOnCancellation = false,
+                                startIfNeeded = false,
+                            )
+                            type == "subscribe_aether_extensions" -> request(
+                                type = "unsubscribe_aether_extensions",
+                                payload = JSONObject().put("request_id", id),
+                                timeoutMillis = PiBridgePingTimeoutMillis,
+                                abortOnCancellation = false,
+                                startIfNeeded = false,
+                            )
+                        }
+                    }
+                }
+            }
             diagnosticLogger.exception(
                 category = "pi_bridge",
                 event = "request_failed",
@@ -1003,8 +1031,10 @@ class PiKernelBridge(
             return
         }
         when {
+            pending != null && pending.response.isCompleted -> Unit
             pending != null && pending.eventChannel != null -> {
-                if (pending.eventChannel.trySend(frame).isFailure) {
+                val queueFailure = piBridgeEventQueueFailure(pending.eventChannel.trySend(frame))
+                if (queueFailure != null) {
                     diagnosticLogger.event(
                         category = "pi_bridge",
                         event = "event_channel_send_failed",
@@ -1015,9 +1045,7 @@ class PiKernelBridge(
                             "frame_event" to frame.event,
                         ),
                     )
-                    pending.response.completeExceptionally(
-                        PiBridgeException("Pi bridge event queue was closed.", code = "event_queue_closed")
-                    )
+                    pending.response.completeExceptionally(queueFailure)
                 }
             }
 

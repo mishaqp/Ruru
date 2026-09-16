@@ -729,12 +729,15 @@ class AetherSelfManagementTool(
                             it.kind == PiExtensionInstallKind.Package && it.source == source
                         }
                         ?: error("No installed extension package matched '$source'.")
-                    piExtensionManager.remove(extension).getOrThrow()
+                    val removal = piExtensionManager.removeWithStatus(extension).getOrThrow()
                     val payload = piKernelBridge.listExtensionPackages()
+                    removal.keys().forEach { key -> payload.put(key, removal.get(key)) }
                     success(payload) {
-                        put("source", source)
-                        put("removed", true)
-                        put("stdout", "Removed extension package '$source'.")
+                        put("stdout", when (removal.optString("reload_status")) {
+                            "scheduled" -> "Removed package '$source'. Its code may remain active until the current turn finishes; verify registration on the next turn."
+                            "applied_with_errors" -> "Removed package '$source' and reloaded. Inspect reload diagnostics for other extension errors."
+                            else -> "Removed package '$source' and applied the extension reload."
+                        })
                     }
                 }
 

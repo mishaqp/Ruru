@@ -10,7 +10,7 @@ async function fixture(source, use) {
   const home = await mkdtemp(join(tmpdir(), 'ruru-deadline-'));
   const root = join(home, '.aether', 'extensions');
   for (const [name, code] of Object.entries({
-    healthy: `export default a => { a.registerSettings({id:'healthy',title:'Healthy',sections:[]}); a.registerAction('ping', () => ({alive:true})); };`,
+    healthy: `export default a => { a.registerSettings({id:'healthy',title:'Healthy',sections:[]}); a.registerAction('ping', () => ({alive:true})); a.on('probe',()=>({healthyEvent:true})); };`,
     broken: source,
   })) {
     await mkdir(join(root, name), {recursive:true});
@@ -102,6 +102,7 @@ test('R06: hanging event does not prevent the next extension handler', {timeout:
     const first=await request('reload_aether_extensions');
     const result=await request('dispatch_aether_extension_event',{event:'probe'});
     assert.ok(result.snapshot.errors.some(e=>/timed out/i.test(e.error)),'missing event timeout diagnostic');
+    assert.equal(result.payload.healthyEvent,true,'later event handler was not executed');
     await healthyResponds(request,first.snapshot);
   });
 });

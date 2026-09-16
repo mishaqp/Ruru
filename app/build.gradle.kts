@@ -34,10 +34,6 @@ val posthogCliHost = localOrEnv(
 val posthogProjectId = localOrEnv("posthog.projectId", "POSTHOG_PROJECT_ID")
 val posthogCliApiKey = localOrEnv("posthog.cliApiKey", "POSTHOG_CLI_API_KEY")
 val posthogExecutable = localOrEnv("posthog.executable", "POSTHOG_EXECUTABLE")
-val nightlyKeystoreFile = localOrEnv("nightly.storeFile", "NIGHTLY_KEYSTORE_FILE")
-val nightlyKeystorePassword = localOrEnv("nightly.storePassword", "NIGHTLY_KEYSTORE_PASSWORD")
-val nightlyKeyAlias = localOrEnv("nightly.keyAlias", "NIGHTLY_KEY_ALIAS")
-val nightlyKeyPassword = localOrEnv("nightly.keyPassword", "NIGHTLY_KEY_PASSWORD")
 // Permanent Ruru release signing material. Never committed: the workflow restores
 // the keystore from Actions secrets into $RUNNER_TEMP and points these at it.
 val ruruKeystoreFile = localOrEnv("ruru.storeFile", "RURU_KEYSTORE_FILE")
@@ -170,19 +166,6 @@ android {
             }
         }
 
-        create("nightly") {
-            if (
-                nightlyKeystoreFile.isNotBlank() &&
-                nightlyKeystorePassword.isNotBlank() &&
-                nightlyKeyAlias.isNotBlank() &&
-                nightlyKeyPassword.isNotBlank()
-            ) {
-                storeFile = file(nightlyKeystoreFile)
-                storePassword = nightlyKeystorePassword
-                keyAlias = nightlyKeyAlias
-                keyPassword = nightlyKeyPassword
-            }
-        }
     }
 
     buildTypes {
@@ -203,21 +186,6 @@ android {
             buildConfigField("Boolean", "SHOWCASE_MODE", "true")
         }
 
-        create("nightly") {
-            initWith(getByName("debug"))
-            applicationIdSuffix = ".nightly"
-            matchingFallbacks += listOf("debug")
-            resValue("string", "nightly_app_name", "Aether Nightly")
-            buildConfigField("String", "UPDATE_CHANNEL", "\"nightly\"")
-            manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_nightly"
-            manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_nightly_round"
-            manifestPlaceholders["appLabel"] = "@string/nightly_app_name"
-            signingConfig = if (nightlyKeystoreFile.isNotBlank()) {
-                signingConfigs.getByName("nightly")
-            } else {
-                signingConfigs.getByName("debug")
-            }
-        }
 
         release {
             // R8 stays OFF for Ruru releases until the release variant has been

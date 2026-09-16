@@ -68,6 +68,8 @@ test("bundled integrations load in a clean native runtime, expose UI, and respec
     }
     assert.ok(inventory.tools.length > 3);
 
+    // This initial snapshot covers visible Auto-provider UI. Provider-specific
+    // descriptions use the same presentation localizer when their category opens.
     const ui = await request("reload_aether_extensions", { context: { platform: "android", language: "ru" } });
     assert.equal(ui.reloaded, true, JSON.stringify(ui));
     assert.deepEqual(ui.snapshot.errors, [], JSON.stringify(ui.snapshot.errors));

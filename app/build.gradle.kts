@@ -289,6 +289,7 @@ kotlin {
 
 dependencies {
     implementation(project(":shared"))
+    implementation(libs.kotlinx.serialization.json)
     implementation(project(":terminal-view"))
 
     implementation(libs.androidx.core.ktx)

@@ -213,7 +213,15 @@ class SharedAgentManagementTools(
             }
             "remove_package" -> {
                 val source = arguments.requiredExtensionPackageSource(action)
-                bridge.removeExtensionPackage(source)
+                val removal = removeExtensionWithReload(
+                    source = source,
+                    remove = { bridge.removeExtensionPackage(source) },
+                    reload = { bridge.reloadAllExtensions() },
+                )
+                return SharedHostToolResult(
+                    outputJson = removal.toString(),
+                    isError = removal["ok"]?.jsonPrimitive?.booleanOrNull != true,
+                )
             }
             "reload" -> bridge.reloadExtensions(sessionId)
             "invoke_command" -> {
